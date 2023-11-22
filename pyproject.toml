@@ -1,0 +1,49 @@
+[project]
+name = "cumulus-fhir-support"
+requires-python = ">= 3.9"
+dependencies = [
+    "fhirclient >= 4.1",
+    "pyarrow >= 12",
+]
+authors = [
+  { name="Michael Terry", email="michael.terry@childrens.harvard.edu" },
+]
+description = "FHIR schema support code for the Cumulus project"
+readme = "README.md"
+license = { text="Apache License 2.0" }
+classifiers = [
+    "License :: OSI Approved :: Apache Software License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+]
+dynamic = ["version"]
+
+[project.urls]
+"Homepage" = "https://github.com/smart-on-fhir/cumulus-fhir-support"
+
+[build-system]
+requires = ["flit_core >=3.4,<4"]
+build-backend = "flit_core.buildapi"
+
+[tool.flit.sdist]
+include = [
+    "tests/",
+    "LICENSE",
+    "*.md",
+]
+
+[tool.bandit]
+exclude_dirs = ["tests"]
+
+[tool.black]
+line-length = 100
+
+[project.optional-dependencies]
+tests = [
+    "pytest",
+]
+dev = [
+    "black >= 23, < 24",
+    "pre-commit",
+]
