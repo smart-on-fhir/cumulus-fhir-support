@@ -181,3 +181,41 @@ class SchemaDetectionTests(unittest.TestCase):
         schema = support.pyarrow_schema_from_rows("Observation", rows)
 
         self.assertNotIn("invalid_field", schema.names)
+
+    def test_contained_resources(self):
+        """Verify that we include contained schemas"""
+        # Also see https://github.com/smart-on-fhir/cumulus-etl/issues/250 for discussion
+        # of whether it is wise to just comingle the schema like this.
+        rows = [
+            {
+                "contained": [
+                    {"resourceType": "Medication", "code": {"text": "aspirin"}},
+                    {"resourceType": "Patient", "gender": "unknown", "extraField": False},
+                    {"unknownField": True, "gender": 3},
+                ]
+            }
+        ]
+        schema = support.pyarrow_schema_from_rows("MedicationRequest", rows)
+        contained_type = schema.field("contained").type.value_type
+
+        # Not-mentioned fields aren't present, but mentioned ones are
+
+        # Medication
+        self.assertEqual(pyarrow.string(), contained_type.field("code").type.field("text").type)
+        self.assertEqual(-1, contained_type.get_field_index("status"))
+
+        # Patient
+        self.assertEqual(pyarrow.string(), contained_type.field("gender").type)
+        self.assertEqual(-1, contained_type.get_field_index("birthDate"))
+
+        # Extra fields
+        self.assertEqual(-1, contained_type.get_field_index("extraField"))
+        self.assertEqual(-1, contained_type.get_field_index("unknownField"))
+
+    def test_contained_resources_empty(self):
+        """Verify that we leave basic schema in there if no contained resources"""
+        schema = support.pyarrow_schema_from_rows("AllergyIntolerance")
+        contained_type = schema.field("contained").type.value_type
+        self.assertEqual(pyarrow.string(), contained_type.field("id").type)
+        self.assertEqual(pyarrow.string(), contained_type.field("implicitRules").type)
+        self.assertEqual(pyarrow.string(), contained_type.field("language").type)
