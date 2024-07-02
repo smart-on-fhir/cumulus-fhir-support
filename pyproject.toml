@@ -41,9 +41,10 @@ line-length = 100
 
 [project.optional-dependencies]
 tests = [
+    "ddt",
     "pytest",
 ]
 dev = [
-    "black >= 23, < 24",
+    "black >= 24, < 25",
     "pre-commit",
 ]
