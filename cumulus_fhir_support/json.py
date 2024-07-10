@@ -44,7 +44,7 @@ import pathlib
 from typing import TYPE_CHECKING, Any, Iterable, Optional, Union
 
 if TYPE_CHECKING:
-    import fsspec
+    import fsspec  # pragma: no cover
 
 PathType = Union[str, pathlib.Path]
 ResourceType = Union[str, Iterable[str], None]

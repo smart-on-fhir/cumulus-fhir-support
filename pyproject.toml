@@ -43,6 +43,7 @@ line-length = 100
 tests = [
     "ddt",
     "pytest",
+    "pytest-cov",
 ]
 dev = [
     "black >= 24, < 25",

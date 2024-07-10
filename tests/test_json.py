@@ -261,6 +261,12 @@ class NdjsonTests(unittest.TestCase):
         mock_fs.ls = fake_ls
         mock_fs.open = fake_open
 
+        # Missing dir
+        with self.assert_no_logs():
+            rows = support.read_multiline_json_from_dir("not-present", "Patient", fsspec_fs=mock_fs)
+        self.assertEqual([], list(rows))
+
+        # Dir exists
         with self.assert_no_logs():
             rows = support.read_multiline_json_from_dir("folder", "Patient", fsspec_fs=mock_fs)
         self.assertEqual(["P2", "P1"], [x["id"] for x in rows])
