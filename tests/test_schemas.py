@@ -1,6 +1,7 @@
 """Tests for schemas.py"""
 
 import unittest
+from unittest import mock
 
 import pyarrow
 
@@ -219,3 +220,15 @@ class SchemaDetectionTests(unittest.TestCase):
         self.assertEqual(pyarrow.string(), contained_type.field("id").type)
         self.assertEqual(pyarrow.string(), contained_type.field("implicitRules").type)
         self.assertEqual(pyarrow.string(), contained_type.field("language").type)
+
+    @mock.patch("fhirclient.models.fhirelementfactory.FHIRElementFactory.instantiate")
+    def test_unexpected_fhir_type(self, mock_instantiate):
+        """Verify that we error out if an unknown FHIR type is provided"""
+        mock_resource = mock.MagicMock()
+        mock_resource.elementProperties.return_value = [
+            ("fieldBoolean", "fieldBoolean", bool, False, None, False),
+            ("fieldObject", "fieldObject", object, False, None, False),
+        ]
+        mock_instantiate.return_value = mock_resource
+        with self.assertRaisesRegex(ValueError, "Unexpected type: <class 'object'>"):
+            support.pyarrow_schema_from_rows("AllergyIntolerance")
