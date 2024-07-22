@@ -239,6 +239,6 @@ def _basic_fhir_to_pyarrow_type(pytype: type) -> pyarrow.DataType:
         return pyarrow.string()
     elif pytype is bool:
         return pyarrow.bool_()
-    elif pytype is fhirdate.FHIRDate:
+    elif issubclass(pytype, fhirdate.FHIRDate):
         return pyarrow.string()  # just leave it as a string, like it appears in the JSON
     raise ValueError(f"Unexpected type: {pytype}")
