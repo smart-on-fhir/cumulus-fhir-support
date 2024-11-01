@@ -232,3 +232,74 @@ class SchemaDetectionTests(unittest.TestCase):
         mock_instantiate.return_value = mock_resource
         with self.assertRaisesRegex(ValueError, "Unexpected type: <class 'object'>"):
             support.pyarrow_schema_from_rows("AllergyIntolerance")
+
+    def test_primitive_field_extension(self):
+        """Verify that we support extensions to primitive fields"""
+        # See http://hl7.org/fhir/R4/json.html#primitive for details
+        rows = [
+            {
+                # Non-existant sunder field
+                "_doesNotExist": {"id": "test-fake"},
+                # Extension only, no ID
+                "_status": {"extension": [{"valueCode": "test-status"}]},
+                # ID only, no extension (but with bogus modifierExtension that will be ignored)
+                "_priority": {"id": "test-priority", "modifierExtension": "not-supported"},
+                # Array
+                "_instantiatesUri": [
+                    None,
+                    {"id": "test-array"},
+                    {"extension": [{"url": "test"}]},
+                ],
+                # Deep field
+                "dispenseRequest": {
+                    "validityPeriod": {"_start": {"id": "test-start"}},
+                },
+            }
+        ]
+        schema = support.pyarrow_schema_from_rows("MedicationRequest", rows)
+
+        self.assertEqual(-1, schema.get_field_index("_doesNotExist"))
+        self.assertEqual(-1, schema.get_field_index("_intent"))  # never specified
+        self.assertEqual(
+            pyarrow.struct(
+                {
+                    "extension": pyarrow.list_(
+                        pyarrow.struct(
+                            {
+                                "valueCode": pyarrow.string(),
+                            }
+                        )
+                    ),
+                }
+            ),
+            schema.field("_status").type,
+        )
+        self.assertEqual(
+            pyarrow.struct({"id": pyarrow.string()}),
+            schema.field("_priority").type,
+        )
+        self.assertEqual(
+            pyarrow.list_(
+                pyarrow.struct(
+                    {
+                        "extension": pyarrow.list_(
+                            pyarrow.struct(
+                                {
+                                    "url": pyarrow.string(),
+                                }
+                            )
+                        ),
+                        "id": pyarrow.string(),
+                    }
+                )
+            ),
+            schema.field("_instantiatesUri").type,
+        )
+        self.assertEqual(
+            pyarrow.struct(
+                {
+                    "id": pyarrow.string(),
+                }
+            ),
+            schema.field("dispenseRequest").type.field("validityPeriod").type.field("_start").type,
+        )
