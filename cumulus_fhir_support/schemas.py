@@ -1,13 +1,13 @@
 """Detect FHIR resource schemas"""
 
 from collections import namedtuple
-from functools import partial
 from typing import Any, Iterable, Optional
 
 import pyarrow
 from fhirclient.models import (
     codeableconcept,
     coding,
+    element,
     extension,
     fhirabstractbase,
     fhirdate,
@@ -140,7 +140,8 @@ def _create_pyarrow_schema_for_resource(
     """
     instance = fhirelementfactory.FHIRElementFactory.instantiate(resource_type, None)
 
-    # fhirclient doesn't include `resourceType` in the list of properties. So do that manually.
+    # fhirclient doesn't include `resourceType` in the list of properties, because it's only
+    # used in ndjson representations. But it's useful to have, so add it manually.
     type_field = pyarrow.field("resourceType", pyarrow.string())
 
     level = 0 if wide else 2
@@ -153,27 +154,27 @@ def _fhir_obj_to_pyarrow_fields(
     base_obj: fhirabstractbase.FHIRAbstractBase, batch_shape: dict, *, level: int
 ) -> list[pyarrow.Field]:
     """Convert a FHIR instance to a PyArrow Field schema list"""
-    properties = map(FhirProperty._make, base_obj.elementProperties())
-    return list(
-        filter(
-            None,
-            map(
-                partial(
-                    _fhir_to_pyarrow_property,
-                    base_obj=base_obj,
-                    batch_shape=batch_shape,
-                    level=level,
-                ),
-                properties,
-            ),
-        )
-    )
+    fhir_properties = map(FhirProperty._make, base_obj.elementProperties())
+    pa_properties = []
+
+    for fhir_property in fhir_properties:
+        if pa_property := _fhir_to_pyarrow_property(
+            fhir_property,
+            base_obj=base_obj,
+            batch_shape=batch_shape,
+            level=level,
+        ):
+            pa_properties.append(pa_property)
+        if pa_sunder := _sunder_to_pyarrow_property(fhir_property, batch_shape=batch_shape):
+            pa_properties.append(pa_sunder)
+
+    return pa_properties
 
 
 def _fhir_to_pyarrow_property(
     prop: FhirProperty,
     *,
-    base_obj: fhirabstractbase.FHIRAbstractBase,
+    base_obj: Optional[fhirabstractbase.FHIRAbstractBase] = None,
     batch_shape: dict = None,
     level: int,
 ) -> Optional[pyarrow.Field]:
@@ -220,6 +221,38 @@ def _fhir_to_pyarrow_property(
     # Mark all types as nullable, don't worry about the prop.required field.
     # We don't need to be in the business of validation, we just want to provide a schema.
     return pyarrow.field(prop.json_name, pyarrow_type, nullable=True)
+
+
+def _sunder_to_pyarrow_property(
+    prop: FhirProperty,
+    *,
+    batch_shape: Optional[dict] = None,
+) -> Optional[pyarrow.Field]:
+    """
+    Checks for a FhirProperty's "sunder" sibling and returns a PyArrow field for it.
+
+    A sunder (single underscore) field is an adjacent JSON field for primitive types that don't
+    otherwise have a place to put extension information. So "status" might have a sibling
+    "_status" field.
+
+    See http://hl7.org/fhir/R4/json.html#primitive for more information.
+
+    Returns None if the sunder field isn't present.
+    """
+    # First, check if the sunder version is even present.
+    if not batch_shape or f"_{prop.json_name}" not in batch_shape:
+        return None
+
+    # Make a fake property definition and see if it's good.
+    sunder_prop = FhirProperty(
+        name=f"_{prop.name}",
+        json_name=f"_{prop.json_name}",
+        pytype=element.Element,
+        is_list=prop.is_list,
+        of_many=prop.of_many,
+        required=prop.required,
+    )
+    return _fhir_to_pyarrow_property(sunder_prop, level=LEVEL_INCLUSION, batch_shape=batch_shape)
 
 
 def _basic_fhir_to_pyarrow_type(pytype: type) -> pyarrow.DataType:
