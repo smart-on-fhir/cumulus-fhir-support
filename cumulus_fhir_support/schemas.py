@@ -1,7 +1,8 @@
 """Detect FHIR resource schemas"""
 
 from collections import namedtuple
-from typing import Any, Iterable, Optional
+from collections.abc import Iterable
+from typing import Any, Optional
 
 import pyarrow
 from fhirclient.models import (
@@ -14,7 +15,6 @@ from fhirclient.models import (
     fhirelementfactory,
 )
 
-
 FhirProperty = namedtuple(
     "FhirProperty", ["name", "json_name", "pytype", "is_list", "of_many", "required"]
 )
@@ -24,7 +24,9 @@ FhirProperty = namedtuple(
 LEVEL_INCLUSION = 1
 
 
-def pyarrow_schema_from_rows(resource_type: str, rows: Iterable[dict] = None) -> pyarrow.Schema:
+def pyarrow_schema_from_rows(
+    resource_type: str, rows: Optional[Iterable[dict]] = None
+) -> pyarrow.Schema:
     """
     Creates a PyArrow schema based off the named resource (like 'Observation') and row contents.
 
@@ -175,7 +177,7 @@ def _fhir_to_pyarrow_property(
     prop: FhirProperty,
     *,
     base_obj: Optional[fhirabstractbase.FHIRAbstractBase] = None,
-    batch_shape: dict = None,
+    batch_shape: Optional[dict] = None,
     level: int,
 ) -> Optional[pyarrow.Field]:
     """Converts a single FhirProperty to a PyArrow Field, or None if this field should be skipped"""
