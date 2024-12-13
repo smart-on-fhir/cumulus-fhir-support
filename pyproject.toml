@@ -8,7 +8,7 @@ dependencies = [
 authors = [
   { name="Michael Terry", email="michael.terry@childrens.harvard.edu" },
 ]
-description = "FHIR schema support code for the Cumulus project"
+description = "FHIR support code for the Cumulus project"
 readme = "README.md"
 license = { text="Apache License 2.0" }
 classifiers = [
@@ -33,12 +33,6 @@ include = [
     "*.md",
 ]
 
-[tool.bandit]
-exclude_dirs = ["tests"]
-
-[tool.black]
-line-length = 100
-
 [project.optional-dependencies]
 tests = [
     "ddt",
@@ -46,6 +40,28 @@ tests = [
     "pytest-cov",
 ]
 dev = [
-    "black >= 24, < 25",
     "pre-commit",
+    # Ruff is using minor versions for breaking changes until their 1.0 release.
+    # See https://docs.astral.sh/ruff/versioning/
+    "ruff < 0.9",  # keep in rough sync with pre-commit-config.yaml
 ]
+
+[tool.ruff]
+line-length = 100
+
+[tool.ruff.lint]
+allowed-confusables = ["’"]  # allow proper apostrophes
+select = [
+    "A",  # prevent using keywords that clobber python builtins
+    "E",  # pycodestyle
+    "F",  # pyflakes
+    "I",  # isort
+    "PLE",  # pylint errors
+    "PLW",  # pylint warnings
+    "RUF",  # the ruff developer's own rules
+    "S",  # bandit security warnings
+    "UP",  # alert you when better syntax is available in your python version
+]
+
+[tool.ruff.lint.per-file-ignores]
+"**/__init__.py" = ["F401"]  # init files hold API, so not using imports is intentional

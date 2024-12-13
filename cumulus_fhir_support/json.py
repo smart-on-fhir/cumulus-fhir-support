@@ -41,7 +41,8 @@ import json
 import logging
 import os
 import pathlib
-from typing import TYPE_CHECKING, Any, Iterable, Optional, Union
+from collections.abc import Iterable
+from typing import TYPE_CHECKING, Any, Optional, Union
 
 if TYPE_CHECKING:
     import fsspec  # pragma: no cover
