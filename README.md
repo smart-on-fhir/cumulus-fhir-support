@@ -20,9 +20,9 @@ import cumulus_fhir_support
 
 cumulus_fhir_support.list_multiline_json_in_dir("/")
 # {
-#     "/random.jsonl": None,
 #     "/con1.ndjson": "Condition",
 #     "/pat1.jsonl": "Patient",
+#     "/random.jsonl": None,
 # }
 
 cumulus_fhir_support.list_multiline_json_in_dir("/", "Patient")
@@ -77,10 +77,10 @@ import cumulus_fhir_support
 
 list(cumulus_fhir_support.read_multiline_json_from_dir("/"))
 # [
-#     {"description": "not a fhir object"},
 #     {"resourceType": "Condition", "id": "con1", "onsetDateTime": "2011-11-24"},
 #     {"resourceType": "Patient", "id": "pat1", "birthDate": "2020-10-16"},
 #     {"resourceType": "Patient", "id": "pat2", "birthDate": "2013-04-18"},
+#     {"description": "not a fhir object"},
 # ]
 
 list(cumulus_fhir_support.read_multiline_json_from_dir("/", "Condition"))
