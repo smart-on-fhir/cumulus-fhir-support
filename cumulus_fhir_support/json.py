@@ -67,7 +67,7 @@ def list_multiline_json_in_dir(
     - Will return an empty dict if the path does not exist.
     - Passing None as the resource filter (the default) will return all multi-line JSON found.
     - Returned filenames will be full paths.
-    - The order of filenames will be consistent across calls.
+    - The order of returned filenames will be consistent across calls (Python sort order).
     - This function will notice both JSON Lines (.jsonl) and NDJSON (.ndjson) files.
 
     Examples:
@@ -105,7 +105,7 @@ def list_multiline_json_in_dir(
 
     # Now grab filenames for all target resource types
     results = {}
-    for child in sorted(children):  # sort for reproducibility
+    for child in sorted(children):  # sorted as an API promise
         results.update(_get_resource_type(child, resource, fsspec_fs=fsspec_fs))
     return results
 
@@ -229,7 +229,8 @@ def read_multiline_json_from_dir(
     - Will return an empty result if the path does not exist or is not readable.
     - Passing None as the resource filter (the default) will return all multi-line JSON found.
     - The lines of JSON are not required to be dictionaries.
-    - The order of results will be consistent across calls.
+    - The order of results will be consistent across calls (filenames are Python-sorted first,
+      then rows are returned from each file in order, top to bottom)
     - This function will notice both JSON Lines (.jsonl) and NDJSON (.ndjson) files.
 
     :param path: the folder to scan
