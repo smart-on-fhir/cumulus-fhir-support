@@ -22,7 +22,7 @@ class NdjsonTests(unittest.TestCase):
     def assert_no_logs(self):
         # Back port of assertNoLogs from Python 3.10
         # Can drop this once we depend on 3.10+
-        with mock.patch("cumulus_fhir_support.json.logger") as mock_logger:
+        with mock.patch("cumulus_fhir_support.ml_json.logger") as mock_logger:
             yield
         self.assertEqual(0, mock_logger.error.call_count)
         self.assertEqual(0, mock_logger.warning.call_count)
@@ -55,7 +55,9 @@ class NdjsonTests(unittest.TestCase):
                 self.assertEqual([], list(support.read_multiline_json(f"{tmpdir}/not-here")))
                 self.assertEqual(1, len(cm.output))
                 self.assertTrue(
-                    cm.output[0].startswith("ERROR:cumulus_fhir_support.json:Could not read from"),
+                    cm.output[0].startswith(
+                        "ERROR:cumulus_fhir_support.ml_json:Could not read from"
+                    ),
                     cm.output[0],
                 )
 
@@ -73,7 +75,9 @@ class NdjsonTests(unittest.TestCase):
                 )
                 self.assertEqual(1, len(cm.output))
                 self.assertTrue(
-                    cm.output[0].startswith("WARNING:cumulus_fhir_support.json:Could not decode"),
+                    cm.output[0].startswith(
+                        "WARNING:cumulus_fhir_support.ml_json:Could not decode"
+                    ),
                     cm.output[0],
                 )
 
@@ -204,7 +208,7 @@ class NdjsonTests(unittest.TestCase):
             )
             self.assertEqual(1, len(cm.output))
             self.assertTrue(
-                cm.output[0].startswith("WARNING:cumulus_fhir_support.json:Could not read from"),
+                cm.output[0].startswith("WARNING:cumulus_fhir_support.ml_json:Could not read from"),
                 cm.output[0],
             )
 
@@ -251,8 +255,7 @@ class NdjsonTests(unittest.TestCase):
             self.assertEqual(mode, "r")
             self.assertEqual(encoding, "utf8")
             return io.StringIO(
-                '{"id": "P2", "resourceType": "Patient"}\n'
-                '{"id": "P1", "resourceType": "Patient"}\n'
+                '{"id": "P2", "resourceType": "Patient"}\n{"id": "P1", "resourceType": "Patient"}\n'
             )
 
         mock_fs = mock.Mock()
