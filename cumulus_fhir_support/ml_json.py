@@ -37,12 +37,13 @@ including referencing it by name in the spec and some mimetypes
 (see https://www.hl7.org/fhir/nd-json.html).
 """
 
+import gzip
 import json
 import logging
 import os
 import pathlib
 from collections.abc import Iterable
-from typing import TYPE_CHECKING, Any, Optional, Union
+from typing import TYPE_CHECKING, Any, Optional, TextIO, Union
 
 if TYPE_CHECKING:
     import fsspec  # pragma: no cover
@@ -110,6 +111,22 @@ def list_multiline_json_in_dir(
     return results
 
 
+def _open(
+    path: PathType,
+    *,
+    fsspec_fs: Optional["fsspec.AbstractFileSystem"] = None,
+) -> TextIO:
+    """Opens a file with optional compression and fsspec"""
+    if fsspec_fs:
+        return fsspec_fs.open(str(path), "r", compression="infer", encoding="utf8")
+
+    suffix = pathlib.Path(path).suffix.casefold()
+    if suffix == ".gz":
+        return gzip.open(path, "rt", encoding="utf8")
+    else:
+        return open(path, encoding="utf8")
+
+
 def _get_resource_type(
     path: str,
     target_resources: Optional[set[str]],
@@ -148,7 +165,13 @@ def _get_resource_type(
     :return: a tiny dict of {path: resourceType} if the file is valid else {}
     """
     # Must look like a multi-line JSON file
-    if pathlib.Path(path).suffix.casefold() not in {".jsonl", ".ndjson"}:
+    good_endings = {".jsonl", ".ndjson"}
+    good_compressions = {".gz"}
+    suffixes = [x.casefold() for x in pathlib.Path(path).suffixes]
+    valid_filename = (len(suffixes) > 0 and suffixes[-1] in good_endings) or (
+        len(suffixes) > 1 and suffixes[-2] in good_endings and suffixes[-1] in good_compressions
+    )
+    if not valid_filename:
         return {}
 
     # Must be a regular file
@@ -163,8 +186,7 @@ def _get_resource_type(
         # And since we cannot assume that "resourceType" is the first field,
         # we must parse the whole first line.
         # See https://www.hl7.org/fhir/R4/json.html#resources
-        open_func = fsspec_fs.open if fsspec_fs else open
-        with open_func(path, "r", encoding="utf8") as f:
+        with _open(path, fsspec_fs=fsspec_fs) as f:
             if not (line := f.readline()).rstrip("\r\n"):
                 return {}
             parsed = json.loads(line)
@@ -197,10 +219,8 @@ def read_multiline_json(
     :param fsspec_fs: optional fsspec FileSystem to use for I/O
     :return: an iterable of parsed JSON results, line by line
     """
-    path = str(path)
-    open_func = fsspec_fs.open if fsspec_fs else open
     try:
-        with open_func(path, "r", encoding="utf8") as f:
+        with _open(path, fsspec_fs=fsspec_fs) as f:
             for line_num, line in enumerate(f):
                 if not line.rstrip("\r\n"):
                     # ignore empty lines (shouldn't normally happen,

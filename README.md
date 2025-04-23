@@ -15,12 +15,15 @@ pip install cumulus-fhir-support
 Lists available multiline JSON files in the target directory
 (allowing filtering by FHIR resource).
 
+Files with the `.jsonl` or `.ndjson` suffixes are supported.
+Files with an additional `.gz` suffix will also be returned.
+
 ```python3
 import cumulus_fhir_support
 
 cumulus_fhir_support.list_multiline_json_in_dir("/")
 # {
-#     "/con1.ndjson": "Condition",
+#     "/con1.ndjson.gz": "Condition",
 #     "/pat1.jsonl": "Patient",
 #     "/random.jsonl": None,
 # }
@@ -32,7 +35,7 @@ cumulus_fhir_support.list_multiline_json_in_dir("/", "Patient")
 
 cumulus_fhir_support.list_multiline_json_in_dir("/", ["Condition", "Patient"])
 # {
-#     "/con1.ndjson": "Condition",
+#     "/con1.ndjson.gz": "Condition",
 #     "/pat1.jsonl": "Patient",
 # }
 
@@ -48,6 +51,8 @@ cumulus_fhir_support.list_multiline_json_in_dir("s3://mybucket/", fsspec_fs=s3_f
 ### read_multiline_json
 
 Iterates over a single multiline JSON file.
+
+Files with the `.gz` extension are automatically uncompressed.
 
 ```python3
 import cumulus_fhir_support
@@ -71,6 +76,8 @@ list(cumulus_fhir_support.read_multiline_json("/mybucket/procs.ndjson", fsspec_f
 
 Iterates over every JSON object in a directory
 (allowing filtering by FHIR resource).
+
+Files with the `.gz` extension are automatically uncompressed.
 
 ```python3
 import cumulus_fhir_support

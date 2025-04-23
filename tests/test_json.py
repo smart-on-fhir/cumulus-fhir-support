@@ -1,6 +1,7 @@
-"""Tests for ndjson.py"""
+"""Tests for ml_json.py"""
 
 import contextlib
+import gzip
 import io
 import json
 import os
@@ -31,9 +32,14 @@ class NdjsonTests(unittest.TestCase):
     # ** read_multiline_json() **
     # ***************************
 
-    def test_read_happy_path(self):
-        with tempfile.NamedTemporaryFile() as file:
-            with open(file.name, "w", encoding="utf8") as f:
+    @ddt.data(
+        (None, open),
+        (".gz", gzip.open),
+    )
+    @ddt.unpack
+    def test_read_happy_path(self, suffix, open_func):
+        with tempfile.NamedTemporaryFile(suffix=suffix) as file:
+            with open_func(file.name, "wt", encoding="utf8") as f:
                 f.write('{"id": "2"}\n{"id": "1"}')
             with self.assert_no_logs():
                 rows = support.read_multiline_json(file.name)
@@ -97,7 +103,10 @@ class NdjsonTests(unittest.TestCase):
     @staticmethod
     def fill_dir(tmpdir: str, files: dict[str, list[dict]]):
         for basename, content in files.items():
-            with open(f"{tmpdir}/{basename}", "w", encoding="utf8") as f:
+            open_func = open
+            if basename.casefold().endswith(".gz"):
+                open_func = gzip.open
+            with open_func(f"{tmpdir}/{basename}", "wt", encoding="utf8") as f:
                 for row in content:
                     json.dump(row, f)
                     f.write("\n")
@@ -109,7 +118,7 @@ class NdjsonTests(unittest.TestCase):
                 {
                     "README.txt": [{"id": "ignored"}],
                     "file1.ndjson": [{"id": "file1", "resourceType": "Patient"}],
-                    "file2.ndjson": [{"id": "file2"}],
+                    "file2.ndjson.gz": [{"id": "file2"}],
                 },
             )
             with self.assert_no_logs():
@@ -117,7 +126,7 @@ class NdjsonTests(unittest.TestCase):
             self.assertEqual(
                 {
                     f"{tmpdir}/file1.ndjson": "Patient",
-                    f"{tmpdir}/file2.ndjson": None,
+                    f"{tmpdir}/file2.ndjson.gz": None,
                 },
                 files,
             )
@@ -128,15 +137,16 @@ class NdjsonTests(unittest.TestCase):
                 tmpdir,
                 {
                     "file1.ndjson": [{"id": "NDJSON"}],
-                    "file2.jsonl": [{"id": "JSON Lines"}],
+                    "file2.jsonl.Gz": [{"id": "JSON Lines"}],
                     "file3.JSONL": [{"id": "ignores case too"}],
-                    "file3.txt": [{"id": "file3"}],
+                    "file3.txt.GZ": [{"id": "file3"}],
                 },
             )
             with self.assert_no_logs():
                 files = support.list_multiline_json_in_dir(tmpdir)
             self.assertEqual(
-                ["file1.ndjson", "file2.jsonl", "file3.JSONL"], [os.path.basename(p) for p in files]
+                ["file1.ndjson", "file2.jsonl.Gz", "file3.JSONL"],
+                [os.path.basename(p) for p in files],
             )
 
     @ddt.data(
@@ -161,6 +171,8 @@ class NdjsonTests(unittest.TestCase):
                     "non-dict.ndjson": [5, 6],
                     "empty.ndjson": [],
                     ".ndjson": [{"id": "ignored"}],
+                    ".ndjson.gz": [{"id": "ignored"}],
+                    ".gz": [{"id": "ignored"}],
                     "README.txt": [{"id": "ignored"}],
                 },
             )
@@ -226,7 +238,7 @@ class NdjsonTests(unittest.TestCase):
                         {"resourceType": "Condition", "id": "C1"},
                         {"resourceType": "Condition", "id": "C2"},
                     ],
-                    "obs.ndjson": [{"resourceType": "Observation", "id": "O1"}],
+                    "obs.ndjson.GZ": [{"resourceType": "Observation", "id": "O1"}],
                     "empty.ndjson": [],
                 },
             )
@@ -250,9 +262,10 @@ class NdjsonTests(unittest.TestCase):
             self.assertFalse(detail)
             return all_fakes
 
-        def fake_open(filename, mode, encoding):
+        def fake_open(filename, mode, compression, encoding):
             self.assertEqual(filename, "folder/1.ndjson")
             self.assertEqual(mode, "r")
+            self.assertEqual(compression, "infer")
             self.assertEqual(encoding, "utf8")
             return io.StringIO(
                 '{"id": "P2", "resourceType": "Patient"}\n{"id": "P1", "resourceType": "Patient"}\n'
