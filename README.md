@@ -19,30 +19,30 @@ Files with the `.jsonl` or `.ndjson` suffixes are supported.
 Files with an additional `.gz` suffix will also be returned.
 
 ```python3
-import cumulus_fhir_support
+import cumulus_fhir_support as cfs
 
-cumulus_fhir_support.list_multiline_json_in_dir("/")
+cfs.list_multiline_json_in_dir("/")
 # {
 #     "/con1.ndjson.gz": "Condition",
 #     "/pat1.jsonl": "Patient",
 #     "/random.jsonl": None,
 # }
 
-cumulus_fhir_support.list_multiline_json_in_dir("/", "Patient")
+cfs.list_multiline_json_in_dir("/", "Patient")
 # {
 #     "/pat1.jsonl": "Patient",
 # }
 
-cumulus_fhir_support.list_multiline_json_in_dir("/", ["Condition", "Patient"])
+cfs.list_multiline_json_in_dir("/", ["Condition", "Patient"])
 # {
 #     "/con1.ndjson.gz": "Condition",
 #     "/pat1.jsonl": "Patient",
 # }
 
-cumulus_fhir_support.list_multiline_json_in_dir("/does-not-exist/")
+cfs.list_multiline_json_in_dir("/does-not-exist/")
 # {}
 
-cumulus_fhir_support.list_multiline_json_in_dir("s3://mybucket/", fsspec_fs=s3_fs)
+cfs.list_multiline_json_in_dir("s3://mybucket/", fsspec_fs=s3_fs)
 # {
 #     "/mybucket/procs.ndjson": "Procedure",
 # }
@@ -55,18 +55,18 @@ Iterates over a single multiline JSON file.
 Files with the `.gz` extension are automatically uncompressed.
 
 ```python3
-import cumulus_fhir_support
+import cumulus_fhir_support as cfs
 
-list(cumulus_fhir_support.read_multiline_json("/pat1.jsonl"))
+list(cfs.read_multiline_json("/pat1.jsonl"))
 # [
 #     {"resourceType": "Patient", "id": "pat1", "birthDate": "2020-10-16"},
 #     {"resourceType": "Patient", "id": "pat2", "birthDate": "2013-04-18"},
 # ]
 
-list(cumulus_fhir_support.read_multiline_json("/does-not-exist.ndjson"))
+list(cfs.read_multiline_json("/does-not-exist.ndjson"))
 # []
 
-list(cumulus_fhir_support.read_multiline_json("/mybucket/procs.ndjson", fsspec_fs=s3_fs))
+list(cfs.read_multiline_json("/mybucket/procs.ndjson", fsspec_fs=s3_fs))
 # [
 #     {"resourceType": "Procedure", "id": "proc1", "status": "stopped"},
 # ]
@@ -80,9 +80,9 @@ Iterates over every JSON object in a directory
 Files with the `.gz` extension are automatically uncompressed.
 
 ```python3
-import cumulus_fhir_support
+import cumulus_fhir_support as cfs
 
-list(cumulus_fhir_support.read_multiline_json_from_dir("/"))
+list(cfs.read_multiline_json_from_dir("/"))
 # [
 #     {"resourceType": "Condition", "id": "con1", "onsetDateTime": "2011-11-24"},
 #     {"resourceType": "Patient", "id": "pat1", "birthDate": "2020-10-16"},
@@ -90,22 +90,22 @@ list(cumulus_fhir_support.read_multiline_json_from_dir("/"))
 #     {"description": "not a fhir object"},
 # ]
 
-list(cumulus_fhir_support.read_multiline_json_from_dir("/", "Condition"))
+list(cfs.read_multiline_json_from_dir("/", "Condition"))
 # [
 #     {"resourceType": "Condition", "id": "con1", "onsetDateTime": "2011-11-24"},
 # ]
 
-list(cumulus_fhir_support.read_multiline_json_from_dir("/", ["Condition", "Patient"]))
+list(cfs.read_multiline_json_from_dir("/", ["Condition", "Patient"]))
 # [
 #     {"resourceType": "Condition", "id": "con1", "onsetDateTime": "2011-11-24"},
 #     {"resourceType": "Patient", "id": "pat1", "birthDate": "2020-10-16"},
 #     {"resourceType": "Patient", "id": "pat2", "birthDate": "2013-04-18"},
 # ]
 
-list(cumulus_fhir_support.read_multiline_json_from_dir("/does-not-exist/"))
+list(cfs.read_multiline_json_from_dir("/does-not-exist/"))
 # []
 
-list(cumulus_fhir_support.read_multiline_json_from_dir("/mybucket/", fsspec_fs=s3_fs))
+list(cfs.read_multiline_json_from_dir("/mybucket/", fsspec_fs=s3_fs))
 # [
 #     {"resourceType": "Procedure", "id": "proc1", "status": "stopped"},
 # ]
@@ -116,7 +116,7 @@ list(cumulus_fhir_support.read_multiline_json_from_dir("/mybucket/", fsspec_fs=s
 Calculates a schema that can cover a given collection of FHIR objects.
 
 ```python3
-import cumulus_fhir_support
+import cumulus_fhir_support as cfs
 
 rows = [
     {
@@ -140,5 +140,19 @@ rows = [
 # and deep enough for every field in `rows`.
 # That is, both the non-present toplevel field "telecom" and the deeper
 # field "extension.extension.valueCoding.system" will be in the schema.
-schema = cumulus_fhir_support.pyarrow_schema_from_rows("Patient", rows)
+schema = cfs.pyarrow_schema_from_rows("Patient", rows)
+```
+
+### FhirClient
+
+Connect to a FHIR server with a variety of authentication options and retries built-in.
+
+```python3
+import cumulus_fhir_support as cfs
+
+client = cfs.FhirClient("https://r4.smarthealthit.org", {"Patient"})
+
+async with client:
+    response = await client.request("GET", "Patient/2cda5aad-e409-4070-9a15-e1c35c46ed5a")
+    print(response.json())
 ```
