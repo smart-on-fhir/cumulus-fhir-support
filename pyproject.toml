@@ -3,6 +3,8 @@ name = "cumulus-fhir-support"
 requires-python = ">= 3.9"
 dependencies = [
     "fhirclient >= 4.1",
+    "httpx",
+    "jwcrypto",
     "pyarrow >= 12",
 ]
 authors = [
@@ -38,6 +40,8 @@ tests = [
     "ddt",
     "pytest",
     "pytest-cov",
+    "respx",
+    "time-machine",
 ]
 dev = [
     "pre-commit",
@@ -65,3 +69,4 @@ select = [
 
 [tool.ruff.lint.per-file-ignores]
 "**/__init__.py" = ["F401"]  # init files hold API, so not using imports is intentional
+"tests/**" = ["S"]  # tests do suspicious stuff that's fine, actually

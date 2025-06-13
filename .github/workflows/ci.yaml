@@ -35,6 +35,10 @@ jobs:
         run: |
           python -m pytest --cov=cumulus_fhir_support --cov-report=xml
 
+      - name: Log missing coverage
+        run: |
+          coverage report -m --skip-covered
+
       - name: Check coverage report
         if: github.ref != 'refs/heads/main'
         uses: orgoro/coverage@v3.2
