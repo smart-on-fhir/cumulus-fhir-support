@@ -224,7 +224,7 @@ async def _request_once(
             error_class = FatalNetworkError
 
         raise error_class(
-            f'An error occurred when connecting to "{url}": {message}',
+            f'An error occurred when connecting to "{url}": [{response.status_code}] {message}',
             response,
         ) from exc
 
