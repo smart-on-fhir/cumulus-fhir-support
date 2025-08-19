@@ -415,7 +415,7 @@ IRxyq6i4LnRleQHDKzI0hdZJPEQd3k3RsPC9IsBf0A==
         with self.assertRaisesRegex(
             cfs.AuthError,
             'An error occurred when connecting to "https://auth.example.com/token": '
-            f"{expected_error}",
+            f"\[400] {expected_error}",
         ):
             async with cfs.FhirClient(
                 self.server_url, [], smart_client_id=self.client_id, smart_jwks=self.jwks
