@@ -59,17 +59,18 @@ def list_multiline_json_in_dir(
     resource: ResourceType = None,
     *,
     fsspec_fs: Optional["fsspec.AbstractFileSystem"] = None,
+    recursive: bool = False,
 ) -> dict[str, Optional[str]]:
     """
     Returns file info in the target folder that are multi-line JSON files for the given resources.
 
-    - This will not recurse into sub-folders.
     - I/O and JSON errors will be logged, not raised.
     - Will return an empty dict if the path does not exist.
     - Passing None as the resource filter (the default) will return all multi-line JSON found.
     - Returned filenames will be full paths.
     - The order of returned filenames will be consistent across calls (Python sort order).
     - This function will notice both JSON Lines (.jsonl) and NDJSON (.ndjson) files.
+    - Symlinks will be followed and the target destination will be returned.
 
     Examples:
     list_multiline_json_in_dir("/") -> {
@@ -86,17 +87,13 @@ def list_multiline_json_in_dir(
     :param path: the folder to examine
     :param resource: the type of FHIR resource(s) for which to return files
     :param fsspec_fs: optional fsspec FileSystem to use for I/O
+    :param recursive: whether to recursively search subfolders
     :return: a dict of {path: resourceType} for all child files of the appropriate type(s)
     """
-    path = str(path)
     if fsspec_fs:
-        if not fsspec_fs.exists(path):
-            return {}
-        children = fsspec_fs.ls(path, detail=False)
+        children = _list_fsspec_files(fsspec_fs, str(path))
     else:
-        if not os.path.exists(path):
-            return {}
-        children = [f"{path}/{child}" for child in os.listdir(path)]
+        children = _list_local_files(pathlib.Path(path))
 
     # Coalesce resource to None or a set of strings
     if isinstance(resource, str):
@@ -108,6 +105,39 @@ def list_multiline_json_in_dir(
     results = {}
     for child in sorted(children):  # sorted as an API promise
         results.update(_get_resource_type(child, resource, fsspec_fs=fsspec_fs))
+    return results
+
+
+def _list_fsspec_files(
+    fsspec_fs: "fsspec.AbstractFileSystem", path: str, visited: Optional[set[str]] = None
+) -> set[str]:
+    if not fsspec_fs.exists(path):
+        return set()
+    visited = visited or set()
+    results = set()
+    for full, details in fsspec_fs.find(path, detail=True).items():
+        if details.get("islink") and details.get("destination"):
+            resolved = os.path.join(os.path.dirname(full), details.get("destination"))
+            resolved = os.path.normpath(resolved)
+            was_visited = resolved in visited
+            visited.add(resolved)
+            if not was_visited:
+                results |= _list_fsspec_files(fsspec_fs, resolved, visited)
+        elif details.get("type") == "file":
+            results.add(full)
+    return results
+
+
+def _list_local_files(path: pathlib.Path) -> set[str]:
+    if not path.exists():
+        return set()
+    results = set()
+    for dirpath, _dirnames, filenames in os.walk(path, followlinks=True):
+        for filename in filenames:
+            full = pathlib.Path(dirpath) / filename
+            resolved = full.resolve()
+            if resolved.is_file():
+                results.add(str(resolved))
     return results
 
 
@@ -174,11 +204,6 @@ def _get_resource_type(
     if not valid_filename:
         return {}
 
-    # Must be a regular file
-    isfile_func = fsspec_fs.isfile if fsspec_fs else os.path.isfile
-    if not isfile_func(path):
-        return {}
-
     try:
         # Check just the first record, as all records in a file should be the same resource.
         # See https://www.hl7.org/fhir/R4/nd-json.html
@@ -240,11 +265,11 @@ def read_multiline_json_from_dir(
     resource: ResourceType = None,
     *,
     fsspec_fs: Optional["fsspec.AbstractFileSystem"] = None,
+    recursive: bool = False,
 ) -> Iterable[Any]:
     """
     Generator that yields lines of JSON from the target folder.
 
-    - This will not recurse into sub-folders.
     - I/O and JSON errors will be logged, not raised.
     - Will return an empty result if the path does not exist or is not readable.
     - Passing None as the resource filter (the default) will return all multi-line JSON found.
@@ -252,11 +277,15 @@ def read_multiline_json_from_dir(
     - The order of results will be consistent across calls (filenames are Python-sorted first,
       then rows are returned from each file in order, top to bottom)
     - This function will notice both JSON Lines (.jsonl) and NDJSON (.ndjson) files.
+    - Symlinks will be followed.
 
     :param path: the folder to scan
     :param resource: the type of FHIR resource(s) for which to return files
     :param fsspec_fs: optional fsspec FileSystem to use for I/O
+    :param recursive: whether to recursively search subfolders
     :return: an iterable of parsed JSON results, line by line
     """
-    for filename in list_multiline_json_in_dir(path, resource, fsspec_fs=fsspec_fs):
+    for filename in list_multiline_json_in_dir(
+        path, resource, fsspec_fs=fsspec_fs, recursive=recursive
+    ):
         yield from read_multiline_json(filename, fsspec_fs=fsspec_fs)

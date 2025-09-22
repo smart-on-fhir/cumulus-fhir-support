@@ -2,7 +2,6 @@
 
 import contextlib
 import gzip
-import io
 import json
 import os
 import tempfile
@@ -11,6 +10,7 @@ from collections.abc import Generator
 from unittest import mock
 
 import ddt
+import fsspec
 
 import cumulus_fhir_support as support
 
@@ -102,6 +102,7 @@ class NdjsonTests(unittest.TestCase):
 
     @staticmethod
     def fill_dir(tmpdir: str, files: dict[str, list[dict]]):
+        os.makedirs(tmpdir, exist_ok=True)
         for basename, content in files.items():
             open_func = open
             if basename.casefold().endswith(".gz"):
@@ -198,10 +199,12 @@ class NdjsonTests(unittest.TestCase):
             }
             self.assertEqual(expected_files, files)
 
-    def test_list_handles_missing_folder(self):
+    @ddt.data(None, "local")
+    def test_list_handles_missing_folder(self, fs_code):
+        fs = fs_code and fsspec.filesystem(fs_code)
         with tempfile.TemporaryDirectory() as tmpdir:
             with self.assert_no_logs():
-                files = support.list_multiline_json_in_dir(f"{tmpdir}/nope")
+                files = support.list_multiline_json_in_dir(f"{tmpdir}/nope", fsspec_fs=fs)
             self.assertEqual({}, files)
 
     def test_list_decode_error(self):
@@ -224,11 +227,38 @@ class NdjsonTests(unittest.TestCase):
                 cm.output[0],
             )
 
+    @ddt.data(None, "local")
+    def test_recursive_list(self, fs_code):
+        fs = fs_code and fsspec.filesystem(fs_code)
+        with tempfile.TemporaryDirectory() as tmpdir:
+            self.fill_dir(f"{tmpdir}", {"external.ndjson": [{"id": "external"}]})
+            self.fill_dir(f"{tmpdir}/external-dir", {"extern-sub.ndjson": [{"id": "extern-sub"}]})
+            self.fill_dir(f"{tmpdir}/root", {"root.ndjson": [{"id": "root"}]})
+            self.fill_dir(f"{tmpdir}/root/subdir", {"sub.ndjson": [{"id": "sub"}]})
+            os.symlink("../external-dir", f"{tmpdir}/root/external-dir")  # should follow
+            os.symlink("subdir/sub.ndjson", f"{tmpdir}/root/link.ndjson")  # should be ignored
+            os.symlink("../external.ndjson", f"{tmpdir}/root/outer.ndjson")  # should be included
+            with self.assert_no_logs():
+                files = support.list_multiline_json_in_dir(
+                    f"{tmpdir}/root", fsspec_fs=fs, recursive=True
+                )
+            self.assertEqual(
+                list(files),
+                [
+                    f"{tmpdir}/external-dir/extern-sub.ndjson",
+                    f"{tmpdir}/external.ndjson",
+                    f"{tmpdir}/root/root.ndjson",
+                    f"{tmpdir}/root/subdir/sub.ndjson",
+                ],
+            )
+
     # ************************************
     # ** read_multiline_json_from_dir() **
     # ************************************
 
-    def test_read_dir_happy_path(self):
+    @ddt.data(None, "local")
+    def test_read_dir_happy_path(self, fs_code):
+        fs = fs_code and fsspec.filesystem(fs_code)
         with tempfile.TemporaryDirectory() as tmpdir:
             self.fill_dir(
                 tmpdir,
@@ -244,45 +274,8 @@ class NdjsonTests(unittest.TestCase):
             )
 
             with self.assert_no_logs():
-                rows = support.read_multiline_json_from_dir(tmpdir, ["Condition", "Patient"])
+                rows = support.read_multiline_json_from_dir(
+                    tmpdir, ["Condition", "Patient"], fsspec_fs=fs
+                )
             self.assertIsInstance(rows, Generator)
             self.assertEqual(["C1", "C2", "P1"], [x["id"] for x in rows])
-
-    # *******************
-    # ** Miscellaneous **
-    # *******************
-
-    def test_fsspec_support(self):
-        fake_files = ["folder/1.ndjson", "folder/nope"]
-        fake_folders = ["folder/dir.ndjson"]
-        all_fakes = fake_files + fake_folders
-
-        def fake_ls(folder, detail):
-            self.assertEqual(folder, "folder")
-            self.assertFalse(detail)
-            return all_fakes
-
-        def fake_open(filename, mode, compression, encoding):
-            self.assertEqual(filename, "folder/1.ndjson")
-            self.assertEqual(mode, "r")
-            self.assertEqual(compression, "infer")
-            self.assertEqual(encoding, "utf8")
-            return io.StringIO(
-                '{"id": "P2", "resourceType": "Patient"}\n{"id": "P1", "resourceType": "Patient"}\n'
-            )
-
-        mock_fs = mock.Mock()
-        mock_fs.exists = lambda x: x == "folder" or x in all_fakes
-        mock_fs.isfile = lambda x: x in fake_files
-        mock_fs.ls = fake_ls
-        mock_fs.open = fake_open
-
-        # Missing dir
-        with self.assert_no_logs():
-            rows = support.read_multiline_json_from_dir("not-present", "Patient", fsspec_fs=mock_fs)
-        self.assertEqual([], list(rows))
-
-        # Dir exists
-        with self.assert_no_logs():
-            rows = support.read_multiline_json_from_dir("folder", "Patient", fsspec_fs=mock_fs)
-        self.assertEqual(["P2", "P1"], [x["id"] for x in rows])
