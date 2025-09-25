@@ -13,6 +13,7 @@ from fhirclient.models import (
     fhirabstractbase,
     fhirdate,
     fhirelementfactory,
+    period,
 )
 
 FhirProperty = namedtuple(
@@ -36,6 +37,13 @@ def pyarrow_schema_from_rows(
 
     Non-FHIR-spec fields will not be present in the final schema.
     All fields will be marked nullable.
+
+    Certain elements are guaranteed to be fully specified, if any part of them is specified:
+    - CodeableConcept
+    - Coding
+    - Period
+    For example, if `nested.period.start` is in the source data but `.end` is not, `.end` will
+    still be in the returned schema.
 
     :param resource_type: the FHIR resource name to create a schema for
     :param rows: optionally a set of JSON FHIR resources to ensure are covered by the schema
@@ -183,9 +191,9 @@ def _fhir_to_pyarrow_property(
     if batch_shape is not None:
         batch_shape = batch_shape.get(prop.json_name)
 
-    # If we see a piece of a Concept or Coding, we like to grab the full schema for it.
-    # This helps downstream SQL avoid dealing about incomplete Coding fields - which do appear.
-    full_schema_types = (codeableconcept.CodeableConcept, coding.Coding)
+    # If we see a piece of a Concept, Coding, or Period, we like to grab the full schema for it.
+    # This helps downstream SQL avoid dealing with incomplete objects.
+    full_schema_types = (codeableconcept.CodeableConcept, coding.Coding, period.Period)
     is_inside_full_schema_type = isinstance(base_obj, full_schema_types)
     is_extension_type = issubclass(prop.pytype, extension.Extension)
     force_inclusion = is_inside_full_schema_type and not is_extension_type
