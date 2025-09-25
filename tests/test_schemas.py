@@ -158,6 +158,22 @@ class SchemaDetectionTests(unittest.TestCase):
             schema.field("onsetRange").type,
         )
 
+    def test_nested_period_is_expanded(self):
+        rows = [
+            {"dispenseRequest": {"validityPeriod": {"start": "2020-10-30"}}},
+        ]
+        schema = support.pyarrow_schema_from_rows("MedicationRequest", rows)
+        self.assertEqual(
+            pyarrow.struct(
+                {
+                    "id": pyarrow.string(),
+                    "end": pyarrow.string(),
+                    "start": pyarrow.string(),
+                }
+            ),
+            schema.field("dispenseRequest").type.field("validityPeriod").type,
+        )
+
     def test_schema_types_are_coerced(self):
         """Verify that fields with "wrong" input types (like int instead of float) are corrected"""
         # Make sure that we include both wide and deep fields.
