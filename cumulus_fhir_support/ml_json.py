@@ -43,13 +43,13 @@ import logging
 import os
 import pathlib
 from collections.abc import Iterable
-from typing import TYPE_CHECKING, Any, BinaryIO, Optional, Union
+from typing import TYPE_CHECKING, Any, BinaryIO, Optional
 
 if TYPE_CHECKING:
     import fsspec  # pragma: no cover
 
-PathType = Union[str, pathlib.Path]
-ResourceType = Union[str, Iterable[str], None]
+PathType = str | pathlib.Path
+ResourceType = str | Iterable[str] | None
 
 logger = logging.getLogger(__name__)
 
@@ -60,7 +60,7 @@ def list_multiline_json_in_dir(
     *,
     fsspec_fs: Optional["fsspec.AbstractFileSystem"] = None,
     recursive: bool = False,
-) -> dict[str, Optional[str]]:
+) -> dict[str, str | None]:
     """
     Returns file info in the target folder that are multi-line JSON files for the given resources.
 
@@ -109,7 +109,7 @@ def list_multiline_json_in_dir(
 
 
 def _list_fsspec_files(
-    fsspec_fs: "fsspec.AbstractFileSystem", path: str, visited: Optional[set[str]] = None
+    fsspec_fs: "fsspec.AbstractFileSystem", path: str, visited: set[str] | None = None
 ) -> set[str]:
     if not fsspec_fs.exists(path):
         return set()
@@ -159,9 +159,9 @@ def _open(
 
 def _get_resource_type(
     path: str,
-    target_resources: Optional[set[str]],
+    target_resources: set[str] | None,
     fsspec_fs: Optional["fsspec.AbstractFileSystem"] = None,
-) -> dict[str, Optional[str]]:
+) -> dict[str, str | None]:
     """
     Returns path & resource type if the file appears to be for the given resources.
 

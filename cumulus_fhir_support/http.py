@@ -5,7 +5,6 @@ import datetime
 import email.utils
 from collections.abc import Awaitable, Callable, Iterable
 from json import JSONDecodeError
-from typing import Optional
 
 import httpx
 
@@ -18,7 +17,7 @@ class NetworkError(Exception):
     Like DNS errors or other transport errors.
     """
 
-    def __init__(self, msg: str, response: Optional[httpx.Response]):
+    def __init__(self, msg: str, response: httpx.Response | None):
         super().__init__(msg)
         self.response = response
 
@@ -62,13 +61,13 @@ async def http_request(
     method: str,
     url: str,
     *,
-    headers: Optional[dict] = None,
+    headers: dict | None = None,
     stream: bool = False,
-    retry_delays: Optional[Iterable[int]] = None,
-    request_callback: Optional[Callable[[], None]] = None,
-    error_callback: Optional[Callable[[NetworkError], None]] = None,
-    retry_callback: Optional[Callable[[Optional[httpx.Response], int], None]] = None,
-    auth_callback: Optional[Callable[[], Awaitable[dict[str, str]]]] = None,
+    retry_delays: Iterable[int] | None = None,
+    request_callback: Callable[[], None] | None = None,
+    error_callback: Callable[[NetworkError], None] | None = None,
+    retry_callback: Callable[[httpx.Response | None, int], None] | None = None,
+    auth_callback: Callable[[], Awaitable[dict[str, str]]] | None = None,
     **kwargs,  # passed on to AsyncClient.build_request
 ) -> httpx.Response:
     """
@@ -97,7 +96,7 @@ async def http_request(
     # fatal.) It's not the worst thing to try hard to be certain, but since this is a widely
     # used default value, let's not get too crazy with the delays unless the caller opts-in
     # by providing even bigger delays as an argument.
-    retry_delays: list[Optional[int]] = [1, 1] if retry_delays is None else list(retry_delays)
+    retry_delays: list[int | None] = [1, 1] if retry_delays is None else list(retry_delays)
     retry_delays.append(None)  # add a final no-delay request for the loop below
 
     headers = dict(headers or {})  # make copy, because we may modify it for auth
@@ -157,7 +156,7 @@ async def _request_once(
     method: str,
     url: str,
     *,
-    headers: Optional[dict] = None,
+    headers: dict | None = None,
     stream: bool = False,
     **kwargs,  # passed on to AsyncClient.build_request
 ) -> httpx.Response:

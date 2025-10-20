@@ -4,7 +4,6 @@ import enum
 import json
 import os
 from collections.abc import Callable, Iterable
-from typing import Optional
 
 import httpx
 
@@ -33,17 +32,17 @@ class FhirClient:
 
     def __init__(
         self,
-        url: Optional[str],
+        url: str | None,
         resources: Iterable[str],
         *,
-        token_url: Optional[str] = None,
-        basic_user: Optional[str] = None,
-        basic_password: Optional[str] = None,
-        bearer_token: Optional[str] = None,
-        smart_client_id: Optional[str] = None,
-        smart_jwks: Optional[dict] = None,
-        smart_pem: Optional[str] = None,
-        max_connections: Optional[int] = None,
+        token_url: str | None = None,
+        basic_user: str | None = None,
+        basic_password: str | None = None,
+        bearer_token: str | None = None,
+        smart_client_id: str | None = None,
+        smart_jwks: dict | None = None,
+        smart_pem: str | None = None,
+        max_connections: int | None = None,
     ):
         """
         Initialize and authorize a BackendServiceServer context manager.
@@ -82,7 +81,7 @@ class FhirClient:
             smart_jwks,
             smart_pem,
         )
-        self._session: Optional[httpx.AsyncClient] = None
+        self._session: httpx.AsyncClient | None = None
         self._capabilities: dict = {}
 
     async def __aenter__(self):
@@ -104,12 +103,12 @@ class FhirClient:
         method: str,
         path: str,
         *,
-        headers: Optional[dict] = None,
+        headers: dict | None = None,
         stream: bool = False,
-        retry_delays: Optional[Iterable[int]] = None,
-        request_callback: Optional[Callable[[], None]] = None,
-        error_callback: Optional[Callable[[http.NetworkError], None]] = None,
-        retry_callback: Optional[Callable[[Optional[httpx.Response], int], None]] = None,
+        retry_delays: Iterable[int] | None = None,
+        request_callback: Callable[[], None] | None = None,
+        error_callback: Callable[[http.NetworkError], None] | None = None,
+        retry_callback: Callable[[httpx.Response | None, int], None] | None = None,
     ) -> httpx.Response:
         """
         Issues an HTTP request.
@@ -240,10 +239,10 @@ class FhirClient:
         fhir_url: str,
         resources: Iterable[str],
         *,
-        smart_client_id: Optional[str] = None,
-        smart_key: Optional[str] = None,
-        basic_password: Optional[str] = None,
-        bearer_token: Optional[str] = None,
+        smart_client_id: str | None = None,
+        smart_key: str | None = None,
+        basic_password: str | None = None,
+        bearer_token: str | None = None,
         **kwargs,
     ) -> "FhirClient":
         """
@@ -262,7 +261,7 @@ class FhirClient:
             with open(path, encoding="utf8") as f:
                 return f.read().strip()
 
-        def read_file_if_present(secret_or_path: Optional[str]) -> Optional[str]:
+        def read_file_if_present(secret_or_path: str | None) -> str | None:
             if not secret_or_path:
                 return None
 

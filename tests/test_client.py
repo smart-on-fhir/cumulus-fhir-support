@@ -4,7 +4,6 @@ import datetime
 import tempfile
 import time
 import unittest
-from typing import Optional
 from unittest import mock
 
 import ddt
@@ -613,7 +612,7 @@ class VendorQuirkTests(unittest.IsolatedAsyncioTestCase):
         self.addCleanup(self.respx_mock.stop)
         self.respx_mock.start()
 
-    def mock_as_server_type(self, server_type: Optional[str]):
+    def mock_as_server_type(self, server_type: str | None):
         response_json = {}
         if server_type == "epic":
             response_json = {"software": {"name": "Epic"}}

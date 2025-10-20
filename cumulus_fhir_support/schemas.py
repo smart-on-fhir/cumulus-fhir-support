@@ -2,7 +2,7 @@
 
 from collections import namedtuple
 from collections.abc import Iterable
-from typing import Any, Optional
+from typing import Any
 
 import pyarrow
 from fhirclient.models import (
@@ -26,7 +26,7 @@ LEVEL_INCLUSION = 1
 
 
 def pyarrow_schema_from_rows(
-    resource_type: str, rows: Optional[Iterable[dict]] = None
+    resource_type: str, rows: Iterable[dict] | None = None
 ) -> pyarrow.Schema:
     """
     Creates a PyArrow schema based off the named resource (like 'Observation') and row contents.
@@ -72,7 +72,7 @@ def pyarrow_schema_from_rows(
     return schema
 
 
-def _get_shape_of_dicts(total_shape: Optional[dict], item: Any) -> dict:
+def _get_shape_of_dicts(total_shape: dict | None, item: Any) -> dict:
     """
     Examines `item` and gives a description of its "shape".
 
@@ -183,10 +183,10 @@ def _fhir_obj_to_pyarrow_fields(
 def _fhir_to_pyarrow_property(
     prop: FhirProperty,
     *,
-    base_obj: Optional[fhirabstractbase.FHIRAbstractBase] = None,
-    batch_shape: Optional[dict] = None,
+    base_obj: fhirabstractbase.FHIRAbstractBase | None = None,
+    batch_shape: dict | None = None,
     level: int,
-) -> Optional[pyarrow.Field]:
+) -> pyarrow.Field | None:
     """Converts a single FhirProperty to a PyArrow Field, or None if this field should be skipped"""
     if batch_shape is not None:
         batch_shape = batch_shape.get(prop.json_name)
@@ -235,8 +235,8 @@ def _fhir_to_pyarrow_property(
 def _sunder_to_pyarrow_property(
     prop: FhirProperty,
     *,
-    batch_shape: Optional[dict] = None,
-) -> Optional[pyarrow.Field]:
+    batch_shape: dict | None = None,
+) -> pyarrow.Field | None:
     """
     Checks for a FhirProperty's "sunder" sibling and returns a PyArrow field for it.
 
