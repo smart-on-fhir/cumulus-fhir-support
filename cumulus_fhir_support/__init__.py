@@ -11,5 +11,10 @@ from .http import (
     http_request,
     parse_retry_after,
 )
-from .ml_json import list_multiline_json_in_dir, read_multiline_json, read_multiline_json_from_dir
+from .ml_json import (
+    list_multiline_json_in_dir,
+    read_multiline_json,
+    read_multiline_json_from_dir,
+    read_multiline_json_with_details,
+)
 from .schemas import pyarrow_schema_from_rows
