@@ -42,7 +42,7 @@ import json
 import logging
 import os
 import pathlib
-from collections.abc import Iterable
+from collections.abc import Generator, Iterable
 from typing import TYPE_CHECKING, Any, BinaryIO, Optional
 
 if TYPE_CHECKING:
@@ -233,7 +233,7 @@ def read_multiline_json_with_details(
     *,
     fsspec_fs: Optional["fsspec.AbstractFileSystem"] = None,
     offset: int = 0,
-) -> Iterable[dict[str, Any]]:
+) -> Generator[dict[str, Any]]:
     """
     Generator that yields lines of JSON from the target file, plus extra metadata.
 
@@ -251,7 +251,7 @@ def read_multiline_json_with_details(
     :param path: the file to read
     :param fsspec_fs: optional fsspec FileSystem to use for I/O
     :param offset: optionally, how far to seek into the file before returning results
-    :return: an iterable of dictionaries, with per-line info
+    :return: a generator of dictionaries, with per-line info
     """
     try:
         with _open(path, fsspec_fs=fsspec_fs) as f:
@@ -278,7 +278,7 @@ def read_multiline_json(
     path: PathType,
     *,
     fsspec_fs: Optional["fsspec.AbstractFileSystem"] = None,
-) -> Iterable[Any]:
+) -> Generator[Any]:
     """
     Generator that yields lines of JSON from the target file.
 
@@ -289,7 +289,7 @@ def read_multiline_json(
 
     :param path: the file to read
     :param fsspec_fs: optional fsspec FileSystem to use for I/O
-    :return: an iterable of parsed JSON results, line by line
+    :return: a generator of parsed JSON results, line by line
     """
     for line in read_multiline_json_with_details(path, fsspec_fs=fsspec_fs):
         yield line["json"]
@@ -301,7 +301,7 @@ def read_multiline_json_from_dir(
     *,
     fsspec_fs: Optional["fsspec.AbstractFileSystem"] = None,
     recursive: bool = False,
-) -> Iterable[Any]:
+) -> Generator[Any]:
     """
     Generator that yields lines of JSON from the target folder.
 
@@ -318,7 +318,7 @@ def read_multiline_json_from_dir(
     :param resource: the type of FHIR resource(s) for which to return files
     :param fsspec_fs: optional fsspec FileSystem to use for I/O
     :param recursive: whether to recursively search subfolders
-    :return: an iterable of parsed JSON results, line by line
+    :return: a generator of parsed JSON results, line by line
     """
     for filename in list_multiline_json_in_dir(
         path, resource, fsspec_fs=fsspec_fs, recursive=recursive
