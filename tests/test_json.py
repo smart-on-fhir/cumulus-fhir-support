@@ -96,6 +96,46 @@ class NdjsonTests(unittest.TestCase):
             self.assertIsInstance(rows, Generator)
             self.assertEqual([1, ["2"], "3"], list(rows))
 
+    # ****************************************
+    # ** read_multiline_json_with_details() **
+    # ****************************************
+
+    def test_read_with_details_happy_path(self):
+        with tempfile.NamedTemporaryFile() as file:
+            with open(file.name, "w", encoding="utf8") as f:
+                f.write('{"id": "1"}\n\n{"id": "2"}')
+            with self.assert_no_logs():
+                rows = support.read_multiline_json_with_details(file.name)
+            self.assertIsInstance(rows, Generator)
+            self.assertEqual(
+                [
+                    {"json": {"id": "1"}, "line_num": 0, "byte_offset": 0},
+                    {"json": {"id": "2"}, "line_num": 2, "byte_offset": 13},
+                ],
+                list(rows),
+            )
+
+    def test_read_with_details_with_offset(self):
+        with tempfile.NamedTemporaryFile() as file:
+            with open(file.name, "w", encoding="utf8") as f:
+                f.write('{"id": "1"}\n\n{"id": "2"}')
+            with self.assert_no_logs():
+                rows = list(support.read_multiline_json_with_details(file.name, offset=13))
+            self.assertEqual([{"json": {"id": "2"}, "line_num": 0, "byte_offset": 0}], rows)
+
+    def test_read_with_details_with_bad_offset(self):
+        with tempfile.NamedTemporaryFile() as file:
+            with open(file.name, "w", encoding="utf8") as f:
+                f.write('{"id": "1"}\n\n{"id": "2"}')
+            with self.assertLogs("cumulus_fhir_support", level="WARNING") as cm:
+                rows = list(support.read_multiline_json_with_details(file.name, offset=5))
+            self.assertEqual([{"json": {"id": "2"}, "line_num": 2, "byte_offset": 8}], rows)
+            self.assertEqual(1, len(cm.output))
+            self.assertTrue(
+                cm.output[0].startswith("WARNING:cumulus_fhir_support.ml_json:Could not decode"),
+                cm.output[0],
+            )
+
     # **********************************
     # ** list_multiline_json_in_dir() **
     # **********************************

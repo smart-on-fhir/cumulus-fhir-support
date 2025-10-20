@@ -6,7 +6,6 @@ import time
 import urllib.parse
 import uuid
 from collections.abc import Iterable
-from typing import Optional
 
 import httpx
 from jwcrypto import jwk, jwt
@@ -236,15 +235,15 @@ class BearerAuth(Auth):
 
 
 def create_auth(
-    server_root: Optional[str],
+    server_root: str | None,
     resources: Iterable[str],
-    token_url: Optional[str],
-    basic_user: Optional[str],
-    basic_password: Optional[str],
-    bearer_token: Optional[str],
-    smart_client_id: Optional[str],
-    smart_jwks: Optional[dict],
-    smart_pem: Optional[str],
+    token_url: str | None,
+    basic_user: str | None,
+    basic_password: str | None,
+    bearer_token: str | None,
+    smart_client_id: str | None,
+    smart_jwks: dict | None,
+    smart_pem: str | None,
 ) -> Auth:
     """Determine which auth method to use based on user provided arguments"""
     valid_smart_jwks = smart_jwks is not None

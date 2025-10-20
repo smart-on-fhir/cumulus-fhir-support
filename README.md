@@ -72,6 +72,39 @@ list(cfs.read_multiline_json("/mybucket/procs.ndjson", fsspec_fs=s3_fs))
 # ]
 ```
 
+### read_multiline_json_with_details
+
+Lower level function to iterate over a single multiline JSON file, with extra line metadata.
+
+Files with the `.gz` extension are automatically uncompressed.
+
+```python3
+import cumulus_fhir_support as cfs
+
+list(cfs.read_multiline_json_with_details("/pat1.jsonl"))
+# [
+#     {
+#         "json": {"resourceType": "Patient", "id": "pat1", "birthDate": "2020-10-16"},
+#         "line_num": 0,
+#         "byte_offset": 0,
+#     },
+#     {
+#         "json": {"resourceType": "Patient", "id": "pat2", "birthDate": "2013-04-18"},
+#         "line_num": 1,
+#         "byte_offset": 69,
+#     },
+# ]
+
+list(cfs.read_multiline_json_with_details("/pat1.jsonl"), offset=69)
+# [
+#     {
+#         "json": {"resourceType": "Patient", "id": "pat2", "birthDate": "2013-04-18"},
+#         "line_num": 0,
+#         "byte_offset": 0,
+#     },
+# ]
+```
+
 ### read_multiline_json_from_dir
 
 Iterates over every JSON object in a directory

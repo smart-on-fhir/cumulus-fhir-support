@@ -42,14 +42,14 @@ import json
 import logging
 import os
 import pathlib
-from collections.abc import Iterable
-from typing import TYPE_CHECKING, Any, Optional, TextIO, Union
+from collections.abc import Generator, Iterable
+from typing import TYPE_CHECKING, Any, BinaryIO, Optional
 
 if TYPE_CHECKING:
     import fsspec  # pragma: no cover
 
-PathType = Union[str, pathlib.Path]
-ResourceType = Union[str, Iterable[str], None]
+PathType = str | pathlib.Path
+ResourceType = str | Iterable[str] | None
 
 logger = logging.getLogger(__name__)
 
@@ -60,7 +60,7 @@ def list_multiline_json_in_dir(
     *,
     fsspec_fs: Optional["fsspec.AbstractFileSystem"] = None,
     recursive: bool = False,
-) -> dict[str, Optional[str]]:
+) -> dict[str, str | None]:
     """
     Returns file info in the target folder that are multi-line JSON files for the given resources.
 
@@ -109,7 +109,7 @@ def list_multiline_json_in_dir(
 
 
 def _list_fsspec_files(
-    fsspec_fs: "fsspec.AbstractFileSystem", path: str, visited: Optional[set[str]] = None
+    fsspec_fs: "fsspec.AbstractFileSystem", path: str, visited: set[str] | None = None
 ) -> set[str]:
     if not fsspec_fs.exists(path):
         return set()
@@ -145,23 +145,23 @@ def _open(
     path: PathType,
     *,
     fsspec_fs: Optional["fsspec.AbstractFileSystem"] = None,
-) -> TextIO:
+) -> BinaryIO:
     """Opens a file with optional compression and fsspec"""
     if fsspec_fs:
-        return fsspec_fs.open(str(path), "r", compression="infer", encoding="utf8")
+        return fsspec_fs.open(str(path), compression="infer")
 
     suffix = pathlib.Path(path).suffix.casefold()
     if suffix == ".gz":
-        return gzip.open(path, "rt", encoding="utf8")
+        return gzip.open(path)
     else:
-        return open(path, encoding="utf8")
+        return open(path, "rb")
 
 
 def _get_resource_type(
     path: str,
-    target_resources: Optional[set[str]],
+    target_resources: set[str] | None,
     fsspec_fs: Optional["fsspec.AbstractFileSystem"] = None,
-) -> dict[str, Optional[str]]:
+) -> dict[str, str | None]:
     """
     Returns path & resource type if the file appears to be for the given resources.
 
@@ -212,10 +212,10 @@ def _get_resource_type(
         # we must parse the whole first line.
         # See https://www.hl7.org/fhir/R4/json.html#resources
         with _open(path, fsspec_fs=fsspec_fs) as f:
-            if not (line := f.readline()).rstrip("\r\n"):
+            if not (line := f.readline()).rstrip(b"\r\n"):
                 return {}
             parsed = json.loads(line)
-    except Exception as exc:  # pylint: disable=broad-except
+    except Exception as exc:
         logger.warning("Could not read from '%s': %s", path, str(exc))
         return {}
 
@@ -228,36 +228,71 @@ def _get_resource_type(
     return {}
 
 
-def read_multiline_json(
+def read_multiline_json_with_details(
     path: PathType,
     *,
     fsspec_fs: Optional["fsspec.AbstractFileSystem"] = None,
-) -> Iterable[Any]:
+    offset: int = 0,
+) -> Generator[dict[str, Any]]:
     """
-    Generator that yields lines of JSON from the target file.
+    Generator that yields lines of JSON from the target file, plus extra metadata.
+
+    Returned fields:
+    - "json": the parsed line of content
+    - "line_num": the line number (counting from `offset`)
+    - "byte_offset": the byte offset (counting from `offset`)
 
     - I/O and JSON errors will be logged, not raised.
     - Will return an empty result if the path does not exist or is not readable.
+    - Empty lines in the source file will be skipped (but will be represented in the offsets).
     - The lines of JSON are not required to be dictionaries.
+    - Returned line-numbers/byte-offsets and are zero-based _from_ the provided offset
 
     :param path: the file to read
     :param fsspec_fs: optional fsspec FileSystem to use for I/O
-    :return: an iterable of parsed JSON results, line by line
+    :param offset: optionally, how far to seek into the file before returning results
+    :return: a generator of dictionaries, with per-line info
     """
     try:
         with _open(path, fsspec_fs=fsspec_fs) as f:
+            if offset:
+                f.seek(offset)
+            byte_total = 0
             for line_num, line in enumerate(f):
-                if not line.rstrip("\r\n"):
+                byte_num = byte_total
+                byte_total += len(line)
+                if not line.rstrip(b"\r\n"):
                     # ignore empty lines (shouldn't normally happen,
                     # but maybe the file has an extra trailing new line
                     # or some other oddity - let's be graceful)
                     continue
                 try:
-                    yield json.loads(line)
+                    yield {"json": json.loads(line), "line_num": line_num, "byte_offset": byte_num}
                 except json.JSONDecodeError as exc:
                     logger.warning("Could not decode '%s:%d': %s", path, line_num + 1, str(exc))
-    except Exception as exc:  # pylint: disable=broad-except
+    except Exception as exc:
         logger.error("Could not read from '%s': %s", path, str(exc))
+
+
+def read_multiline_json(
+    path: PathType,
+    *,
+    fsspec_fs: Optional["fsspec.AbstractFileSystem"] = None,
+) -> Generator[Any]:
+    """
+    Generator that yields lines of JSON from the target file.
+
+    - I/O and JSON errors will be logged, not raised.
+    - Will return an empty result if the path does not exist or is not readable.
+    - Empty lines in the source file will be skipped.
+    - The lines of JSON are not required to be dictionaries.
+
+    :param path: the file to read
+    :param fsspec_fs: optional fsspec FileSystem to use for I/O
+    :return: a generator of parsed JSON results, line by line
+    """
+    for line in read_multiline_json_with_details(path, fsspec_fs=fsspec_fs):
+        yield line["json"]
 
 
 def read_multiline_json_from_dir(
@@ -266,7 +301,7 @@ def read_multiline_json_from_dir(
     *,
     fsspec_fs: Optional["fsspec.AbstractFileSystem"] = None,
     recursive: bool = False,
-) -> Iterable[Any]:
+) -> Generator[Any]:
     """
     Generator that yields lines of JSON from the target folder.
 
@@ -283,7 +318,7 @@ def read_multiline_json_from_dir(
     :param resource: the type of FHIR resource(s) for which to return files
     :param fsspec_fs: optional fsspec FileSystem to use for I/O
     :param recursive: whether to recursively search subfolders
-    :return: an iterable of parsed JSON results, line by line
+    :return: a generator of parsed JSON results, line by line
     """
     for filename in list_multiline_json_in_dir(
         path, resource, fsspec_fs=fsspec_fs, recursive=recursive
