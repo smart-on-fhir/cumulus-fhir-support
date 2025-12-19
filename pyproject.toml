@@ -10,16 +10,14 @@ dependencies = [
 authors = [
   { name="Michael Terry", email="michael.terry@childrens.harvard.edu" },
 ]
-description = "FHIR support code for the Cumulus project"
 readme = "README.md"
-license = { text="Apache License 2.0" }
+license = "Apache-2.0"
 classifiers = [
-    "License :: OSI Approved :: Apache Software License",
     "Operating System :: OS Independent",
     "Programming Language :: Python :: 3",
     "Topic :: Software Development :: Libraries :: Python Modules",
 ]
-dynamic = ["version"]
+dynamic = ["description", "version"]
 
 [project.urls]
 "Homepage" = "https://github.com/smart-on-fhir/cumulus-fhir-support"
