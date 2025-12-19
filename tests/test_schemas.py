@@ -182,7 +182,6 @@ class SchemaDetectionTests(unittest.TestCase):
                 {
                     "id": pyarrow.string(),
                     "display": pyarrow.string(),
-                    "identifier": pyarrow.struct({}),
                     "reference": pyarrow.string(),
                     "type": pyarrow.string(),
                 }

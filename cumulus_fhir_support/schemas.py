@@ -219,9 +219,12 @@ def _fhir_to_pyarrow_property(
             # so we dodge that bullet.
             return None
         # Recurse!
-        pyarrow_type = pyarrow.struct(
-            _fhir_obj_to_pyarrow_fields(prop.pytype(), batch_shape, level=level + 1)
-        )
+        children = _fhir_obj_to_pyarrow_fields(prop.pytype(), batch_shape, level=level + 1)
+        if not children:
+            # Downstream consumers may rightfully be confused by a struct with no children.
+            # For example, DuckDB raises an exception if it sees them.
+            return None
+        pyarrow_type = pyarrow.struct(children)
     else:
         if level > LEVEL_INCLUSION and not include_in_schema:
             # If we're deeper than our inclusion level,
