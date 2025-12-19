@@ -25,6 +25,8 @@ jobs:
         VERSION=$(echo $GITHUB_REF_NAME | sed 's/^v//')
         sed -i "s/1\!0\.0\.0/$VERSION/w changes.txt" cumulus_fhir_support/__init__.py
         [ -s changes.txt ] || exit 1  # validate that we successfully set the version
+        cat changes.txt
+        cat cumulus_fhir_support/__init__.py
 
     - name: Build
       run: python -m build
