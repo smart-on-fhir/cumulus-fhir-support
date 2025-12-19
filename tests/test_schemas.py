@@ -174,6 +174,22 @@ class SchemaDetectionTests(unittest.TestCase):
             schema.field("dispenseRequest").type.field("validityPeriod").type,
         )
 
+    def test_nested_reference_is_expanded(self):
+        rows = [{"participant": {"individual": {"display": "Mr. Blobby"}}}]
+        schema = support.pyarrow_schema_from_rows("Encounter", rows)
+        self.assertEqual(
+            pyarrow.struct(
+                {
+                    "id": pyarrow.string(),
+                    "display": pyarrow.string(),
+                    "identifier": pyarrow.struct({}),
+                    "reference": pyarrow.string(),
+                    "type": pyarrow.string(),
+                }
+            ),
+            schema.field("participant").type.value_type.field("individual").type,
+        )
+
     def test_schema_types_are_coerced(self):
         """Verify that fields with "wrong" input types (like int instead of float) are corrected"""
         # Make sure that we include both wide and deep fields.

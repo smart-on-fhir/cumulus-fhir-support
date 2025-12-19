@@ -14,6 +14,7 @@ from fhirclient.models import (
     fhirdate,
     fhirelementfactory,
     period,
+    reference,
 )
 
 FhirProperty = namedtuple(
@@ -191,9 +192,14 @@ def _fhir_to_pyarrow_property(
     if batch_shape is not None:
         batch_shape = batch_shape.get(prop.json_name)
 
-    # If we see a piece of a Concept, Coding, or Period, we like to grab the full schema for it.
+    # If we see a piece of an important/common element we like to grab the full schema for it.
     # This helps downstream SQL avoid dealing with incomplete objects.
-    full_schema_types = (codeableconcept.CodeableConcept, coding.Coding, period.Period)
+    full_schema_types = (
+        codeableconcept.CodeableConcept,
+        coding.Coding,
+        period.Period,
+        reference.Reference,  # note: this won't include children of the `identifier` struct child
+    )
     is_inside_full_schema_type = isinstance(base_obj, full_schema_types)
     is_extension_type = issubclass(prop.pytype, extension.Extension)
     force_inclusion = is_inside_full_schema_type and not is_extension_type
