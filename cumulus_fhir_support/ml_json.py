@@ -143,10 +143,7 @@ def _list_fsspec_files(
     return results
 
 
-def _list_local_files(
-    path: pathlib.Path,
-    recursive: bool = False,
-) -> set[str]:
+def _list_local_files(path: pathlib.Path, recursive: bool = False) -> set[str]:
     if not path.exists():
         return set()
     results = set()
@@ -165,10 +162,12 @@ def _open(
     path: PathType,
     *,
     fsspec_fs: Optional["fsspec.AbstractFileSystem"] = None,
+    fsspec_kwargs: dict | None = None,
 ) -> BinaryIO:
     """Opens a file with optional compression and fsspec"""
     if fsspec_fs:
-        return fsspec_fs.open(str(path), compression="infer")
+        fsspec_kwargs = fsspec_kwargs or {}
+        return fsspec_fs.open(str(path), compression="infer", **fsspec_kwargs)
 
     suffix = pathlib.Path(path).suffix.casefold()
     if suffix == ".gz":
@@ -231,10 +230,9 @@ def _get_resource_type(
         # And since we cannot assume that "resourceType" is the first field,
         # we must parse the whole first line.
         # See https://www.hl7.org/fhir/R4/json.html#resources
-        with _open(path, fsspec_fs=fsspec_fs) as f:
-            if not (line := f.readline()).rstrip(b"\r\n"):
-                return {}
-            parsed = json.loads(line)
+        if not (line := _read_first_line(path, fsspec_fs=fsspec_fs)):
+            return {}
+        parsed = json.loads(line)
     except Exception as exc:
         logger.warning("Could not read from '%s': %s", path, str(exc))
         return {}
@@ -246,6 +244,19 @@ def _get_resource_type(
 
     # Didn't match our target resource types, just pretend it doesn't exist
     return {}
+
+
+def _read_first_line(
+    path: PathType,
+    *,
+    fsspec_fs: Optional["fsspec.AbstractFileSystem"] = None,
+) -> bytes:
+    # We just want the first line, and nothing else. The fsspec s3 block size default is 50M,
+    # larger than we usually need for FHIR files. So we try to speed things up by just sipping
+    # what we need. 9k is usually enough to only need one read call for gzipped files, at least
+    # for all but the beefier inlined DocRefs.
+    with _open(path, fsspec_fs=fsspec_fs, fsspec_kwargs={"block_size": 9000}) as f:
+        return f.readline().rstrip(b"\r\n")
 
 
 def read_multiline_json_with_details(
