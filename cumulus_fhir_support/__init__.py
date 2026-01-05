@@ -4,6 +4,7 @@ __version__ = "1!0.0.0"
 
 from .auth import AuthError, AuthFailed, BadAuthArguments
 from .client import FhirClient, ServerType
+from .errors import RequestError
 from .http import (
     FatalNetworkError,
     NetworkError,

@@ -10,10 +10,10 @@ from collections.abc import Iterable
 import httpx
 from jwcrypto import jwk, jwt
 
-from . import http
+from . import errors, http
 
 
-class AuthError(Exception):
+class AuthError(errors.RequestError):
     """Root of all authentication issues"""
 
 
@@ -102,7 +102,7 @@ class JwtAuth(Auth):
             )
             self._access_token = response.json().get("access_token")
         except http.NetworkError as exc:
-            raise AuthFailed(str(exc))
+            raise AuthFailed(f"Could not authenticate: {exc}") from exc
 
     def sign_headers(self) -> dict[str, str]:
         """Add signature token to request headers"""
