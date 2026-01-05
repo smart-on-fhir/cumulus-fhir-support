@@ -8,8 +8,10 @@ from json import JSONDecodeError
 
 import httpx
 
+from . import errors
 
-class NetworkError(Exception):
+
+class NetworkError(errors.RequestError):
     """
     A network error
 
@@ -177,7 +179,8 @@ async def _request_once(
     try:
         response = await client.send(request, stream=stream)
     except httpx.HTTPError as exc:
-        raise FatalNetworkError(str(exc), None) from exc
+        # This could be a DNS error, read error (sudden disconnect), a timeout, or who knows.
+        raise TemporaryNetworkError(str(exc), None) from exc
 
     try:
         response.raise_for_status()

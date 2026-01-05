@@ -276,8 +276,10 @@ class NdjsonTests(unittest.TestCase):
             self.fill_dir(f"{tmpdir}/root", {"root.ndjson": [{"id": "root"}]})
             self.fill_dir(f"{tmpdir}/root/subdir", {"sub.ndjson": [{"id": "sub"}]})
             os.symlink("../external-dir", f"{tmpdir}/root/external-dir")  # should follow
-            os.symlink("subdir/sub.ndjson", f"{tmpdir}/root/link.ndjson")  # should be ignored
-            os.symlink("../external.ndjson", f"{tmpdir}/root/outer.ndjson")  # should be included
+            os.symlink("../external-link", f"{tmpdir}/root/outer.ndjson")  # should follow
+            os.symlink("external.ndjson", f"{tmpdir}/external-link")  # should follow (again)
+
+            # Confirm we iterate recursively if asked
             with self.assert_no_logs():
                 files = support.list_multiline_json_in_dir(
                     f"{tmpdir}/root", fsspec_fs=fs, recursive=True
@@ -289,6 +291,17 @@ class NdjsonTests(unittest.TestCase):
                     f"{tmpdir}/external.ndjson",
                     f"{tmpdir}/root/root.ndjson",
                     f"{tmpdir}/root/subdir/sub.ndjson",
+                ],
+            )
+
+            # And once without the flag
+            with self.assert_no_logs():
+                files = support.list_multiline_json_in_dir(f"{tmpdir}/root", fsspec_fs=fs)
+            self.assertEqual(
+                list(files),
+                [
+                    f"{tmpdir}/external.ndjson",
+                    f"{tmpdir}/root/root.ndjson",
                 ],
             )
 

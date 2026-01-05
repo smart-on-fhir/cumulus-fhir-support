@@ -91,9 +91,9 @@ def list_multiline_json_in_dir(
     :return: a dict of {path: resourceType} for all child files of the appropriate type(s)
     """
     if fsspec_fs:
-        children = _list_fsspec_files(fsspec_fs, str(path))
+        children = _list_fsspec_files(fsspec_fs, str(path), recursive=recursive)
     else:
-        children = _list_local_files(pathlib.Path(path))
+        children = _list_local_files(pathlib.Path(path), recursive=recursive)
 
     # Coalesce resource to None or a set of strings
     if isinstance(resource, str):
@@ -109,30 +109,47 @@ def list_multiline_json_in_dir(
 
 
 def _list_fsspec_files(
-    fsspec_fs: "fsspec.AbstractFileSystem", path: str, visited: set[str] | None = None
+    fsspec_fs: "fsspec.AbstractFileSystem",
+    path: str,
+    *,
+    recursive: bool = False,
+    visited: set[str] | None = None,
 ) -> set[str]:
     if not fsspec_fs.exists(path):
         return set()
     visited = visited or set()
     results = set()
-    for full, details in fsspec_fs.find(path, detail=True).items():
+
+    if recursive:
+        items = fsspec_fs.find(path, detail=True).values()
+    elif visited:
+        items = [fsspec_fs.info(path)]  # no iteration as we follow links
+    else:
+        items = fsspec_fs.ls(path, detail=True)
+
+    for details in items:
+        full = details["name"]
         if details.get("islink") and details.get("destination"):
             resolved = os.path.join(os.path.dirname(full), details.get("destination"))
             resolved = os.path.normpath(resolved)
             was_visited = resolved in visited
             visited.add(resolved)
             if not was_visited:
-                results |= _list_fsspec_files(fsspec_fs, resolved, visited)
+                results |= _list_fsspec_files(
+                    fsspec_fs, resolved, recursive=recursive, visited=visited
+                )
         elif details.get("type") == "file":
             results.add(full)
     return results
 
 
-def _list_local_files(path: pathlib.Path) -> set[str]:
+def _list_local_files(path: pathlib.Path, recursive: bool = False) -> set[str]:
     if not path.exists():
         return set()
     results = set()
     for dirpath, _dirnames, filenames in os.walk(path, followlinks=True):
+        if dirpath != str(path) and not recursive:
+            continue
         for filename in filenames:
             full = pathlib.Path(dirpath) / filename
             resolved = full.resolve()
@@ -145,10 +162,12 @@ def _open(
     path: PathType,
     *,
     fsspec_fs: Optional["fsspec.AbstractFileSystem"] = None,
+    fsspec_kwargs: dict | None = None,
 ) -> BinaryIO:
     """Opens a file with optional compression and fsspec"""
     if fsspec_fs:
-        return fsspec_fs.open(str(path), compression="infer")
+        fsspec_kwargs = fsspec_kwargs or {}
+        return fsspec_fs.open(str(path), compression="infer", **fsspec_kwargs)
 
     suffix = pathlib.Path(path).suffix.casefold()
     if suffix == ".gz":
@@ -211,10 +230,9 @@ def _get_resource_type(
         # And since we cannot assume that "resourceType" is the first field,
         # we must parse the whole first line.
         # See https://www.hl7.org/fhir/R4/json.html#resources
-        with _open(path, fsspec_fs=fsspec_fs) as f:
-            if not (line := f.readline()).rstrip(b"\r\n"):
-                return {}
-            parsed = json.loads(line)
+        if not (line := _read_first_line(path, fsspec_fs=fsspec_fs)):
+            return {}
+        parsed = json.loads(line)
     except Exception as exc:
         logger.warning("Could not read from '%s': %s", path, str(exc))
         return {}
@@ -226,6 +244,19 @@ def _get_resource_type(
 
     # Didn't match our target resource types, just pretend it doesn't exist
     return {}
+
+
+def _read_first_line(
+    path: PathType,
+    *,
+    fsspec_fs: Optional["fsspec.AbstractFileSystem"] = None,
+) -> bytes:
+    # We just want the first line, and nothing else. The fsspec s3 block size default is 50M,
+    # larger than we usually need for FHIR files. So we try to speed things up by just sipping
+    # what we need. 9k is usually enough to only need one read call for gzipped files, at least
+    # for all but the beefier inlined DocRefs.
+    with _open(path, fsspec_fs=fsspec_fs, fsspec_kwargs={"block_size": 9000}) as f:
+        return f.readline().rstrip(b"\r\n")
 
 
 def read_multiline_json_with_details(

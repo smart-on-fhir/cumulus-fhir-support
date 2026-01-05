@@ -132,9 +132,10 @@ class HttpTests(unittest.IsolatedAsyncioTestCase):
         )
 
     @mock.patch("httpx.AsyncClient.send")
-    async def test_invalid_dns(self, mock_send):
+    @mock.patch("asyncio.sleep")
+    async def test_invalid_dns(self, mock_sleep, mock_send):
         """Verify that random pre-response errors bubble up as FatalErrors."""
         mock_send.side_effect = httpx.ConnectTimeout("Connect timeout")
-        with self.assertRaisesRegex(cfs.FatalNetworkError, "Connect timeout") as cm:
+        with self.assertRaisesRegex(cfs.TemporaryNetworkError, "Connect timeout") as cm:
             await cfs.http_request(httpx.AsyncClient(), "GET", "http://example.invalid/")
         self.assertIsNone(cm.exception.response)
