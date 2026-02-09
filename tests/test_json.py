@@ -305,6 +305,24 @@ class NdjsonTests(unittest.TestCase):
                 ],
             )
 
+    @ddt.data(
+        # filename, expected resource type
+        ("blarg.ndjson", None),
+        ("PatientGoal.ndjson", None),
+        ("Patient.Goal.ndjson", None),
+        ("PatientFilename.ndjson", None),
+        ("PractitionerRole.ndjson", "PractitionerRole"),
+        ("0-Practitioner_1.ndjson", "Practitioner"),
+        ("1.Condition.1.ndjson", "Condition"),
+    )
+    @ddt.unpack
+    def test_list_skips_read_on_obvious_files(self, filename, expected_type):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            self.fill_dir(tmpdir, {filename: [{}]})
+            with self.assert_no_logs():
+                files = support.list_multiline_json_in_dir(tmpdir)
+            self.assertEqual(list(files.values()), [expected_type])
+
     # ************************************
     # ** read_multiline_json_from_dir() **
     # ************************************

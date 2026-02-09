@@ -42,8 +42,11 @@ import json
 import logging
 import os
 import pathlib
+import re
 from collections.abc import Generator, Iterable
 from typing import TYPE_CHECKING, Any, BinaryIO, Optional
+
+from . import resource_info
 
 if TYPE_CHECKING:
     import fsspec  # pragma: no cover
@@ -52,6 +55,8 @@ PathType = str | pathlib.Path
 ResourceType = str | Iterable[str] | None
 
 logger = logging.getLogger(__name__)
+
+NONLETTER = re.compile(r"[^a-zA-Z]+")
 
 
 def list_multiline_json_in_dir(
@@ -71,6 +76,7 @@ def list_multiline_json_in_dir(
     - The order of returned filenames will be consistent across calls (Python sort order).
     - This function will notice both JSON Lines (.jsonl) and NDJSON (.ndjson) files.
     - Symlinks will be followed and the target destination will be returned.
+    - Resource type matching will first examine the filename and if unsure, read the first line.
 
     Examples:
     list_multiline_json_in_dir("/") -> {
@@ -222,6 +228,16 @@ def _get_resource_type(
     )
     if not valid_filename:
         return {}
+
+    # Apply a heuristic to try to avoid actually reading the file, which can be slow if we are
+    # scanning over a network:
+    # - If a single resource type appears directly in a filename fragment, assume it applies.
+    # We avoid counting a PractitionerRole.ndjson file as a Practitioner file by only looking for
+    # complete words.
+    pieces = set(NONLETTER.split(pathlib.Path(path).name))
+    found_types = pieces & resource_info.ALL_RESOURCES
+    if len(found_types) == 1:
+        return {path: found_types.pop()}
 
     try:
         # Check just the first record, as all records in a file should be the same resource.
