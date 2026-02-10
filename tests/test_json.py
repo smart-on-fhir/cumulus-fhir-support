@@ -192,11 +192,11 @@ class NdjsonTests(unittest.TestCase):
 
     @ddt.data(
         # target resources, expected answer
-        (None, {"pat1", "pat2", "con", "obs", "none", "non-dict"}),
+        (None, {"pat1", "pat2", "con", "Condition", "obs", "none", "non-dict"}),
         ([], []),
         ("Patient", {"pat1", "pat2"}),
-        ({"Condition", "Observation"}, {"con", "obs"}),
-        (iter(["Condition", None]), {"con", "none", "non-dict"}),
+        ({"Condition", "Observation"}, {"con", "Condition", "obs"}),
+        (iter(["Condition", None]), {"con", "Condition", "none", "non-dict"}),
     )
     @ddt.unpack
     def test_list_resource_filter(self, target_resources, expected_names):
@@ -207,6 +207,7 @@ class NdjsonTests(unittest.TestCase):
                     "pat1.ndjson": [{"resourceType": "Patient"}],
                     "pat2.ndjson": [{"resourceType": "Patient"}],
                     "con.ndjson": [{"resourceType": "Condition"}],
+                    "Condition.ndjson": [],
                     "obs.ndjson": [{"resourceType": "Observation"}],
                     "none.ndjson": [{"id": "no-resource-type"}],
                     "non-dict.ndjson": [5, 6],
@@ -224,6 +225,7 @@ class NdjsonTests(unittest.TestCase):
                 "pat1": "Patient",
                 "pat2": "Patient",
                 "con": "Condition",
+                "Condition": "Condition",
                 "obs": "Observation",
             }
 
@@ -339,6 +341,7 @@ class NdjsonTests(unittest.TestCase):
                         {"resourceType": "Condition", "id": "C1"},
                         {"resourceType": "Condition", "id": "C2"},
                     ],
+                    "Condition.ndjson": [],
                     "obs.ndjson.GZ": [{"resourceType": "Observation", "id": "O1"}],
                     "empty.ndjson": [],
                 },
