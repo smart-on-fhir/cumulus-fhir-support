@@ -237,23 +237,24 @@ def _get_resource_type(
     pieces = set(NONLETTER.split(pathlib.Path(path).name))
     found_types = pieces & resource_info.ALL_RESOURCES
     if len(found_types) == 1:
-        return {path: found_types.pop()}
-
-    try:
-        # Check just the first record, as all records in a file should be the same resource.
-        # See https://www.hl7.org/fhir/R4/nd-json.html
-        #
-        # And since we cannot assume that "resourceType" is the first field,
-        # we must parse the whole first line.
-        # See https://www.hl7.org/fhir/R4/json.html#resources
-        if not (line := _read_first_line(path, fsspec_fs=fsspec_fs)):
+        resource_type = found_types.pop()
+    else:
+        # Try reading from file to see what resource type it holds.
+        try:
+            # Check just the first record, as all records in a file should be the same resource.
+            # See https://www.hl7.org/fhir/R4/nd-json.html
+            #
+            # And since we cannot assume that "resourceType" is the first field,
+            # we must parse the whole first line.
+            # See https://www.hl7.org/fhir/R4/json.html#resources
+            if not (line := _read_first_line(path, fsspec_fs=fsspec_fs)):
+                return {}
+            parsed = json.loads(line)
+        except Exception as exc:
+            logger.warning("Could not read from '%s': %s", path, str(exc))
             return {}
-        parsed = json.loads(line)
-    except Exception as exc:
-        logger.warning("Could not read from '%s': %s", path, str(exc))
-        return {}
 
-    resource_type = parsed.get("resourceType") if isinstance(parsed, dict) else None
+        resource_type = parsed.get("resourceType") if isinstance(parsed, dict) else None
 
     if target_resources is None or resource_type in target_resources:
         return {path: resource_type}
