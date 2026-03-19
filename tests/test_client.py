@@ -460,6 +460,27 @@ IRxyq6i4LnRleQHDKzI0hdZJPEQd3k3RsPC9IsBf0A==
 
             self.assertEqual(2, self.respx_mock["token"].call_count)
 
+    @mock.patch("asyncio.sleep")
+    async def test_retry_oauth_reauth_fatals(self, sleep_mock):
+        """Verify that we retry fatals when reauthorizing."""
+        route = self.respx_mock.get(f"{self.server_url}/foo")
+        route.side_effect = [httpx.Response(401), httpx.Response(200)]
+
+        success = httpx.Response(200, json={"access_token": "1234"})
+        self.respx_mock["token"].side_effect = [success, httpx.Response(400), success]
+
+        async with cfs.FhirClient(
+            self.server_url, [], smart_client_id=self.client_id, smart_jwks=self.jwks
+        ) as server:
+            self.assertEqual(1, self.respx_mock["token"].call_count)
+
+            # Check that we correctly tried to re-authenticate through the fatals
+            response = await server.request("GET", "foo")
+            self.assertEqual(200, response.status_code)
+
+            self.assertEqual(3, self.respx_mock["token"].call_count)
+            self.assertEqual(sleep_mock.call_count, 1)
+
     @ddt.data(
         ('{"testing":"hi"}', ".JwKs", {"smart_jwks": {"keys": [{"testing": "hi"}]}}),
         ("hello world", ".PeM", {"smart_pem": "hello world"}),

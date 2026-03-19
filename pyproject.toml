@@ -19,20 +19,6 @@ classifiers = [
 ]
 dynamic = ["description", "version"]
 
-[project.urls]
-"Homepage" = "https://github.com/smart-on-fhir/cumulus-fhir-support"
-
-[build-system]
-requires = ["flit_core >=3.4,<4"]
-build-backend = "flit_core.buildapi"
-
-[tool.flit.sdist]
-include = [
-    "tests/",
-    "LICENSE",
-    "*.md",
-]
-
 [project.optional-dependencies]
 tests = [
     "ddt",
@@ -46,7 +32,21 @@ dev = [
     "pre-commit",
     # Ruff is using minor versions for breaking changes until their 1.0 release.
     # See https://docs.astral.sh/ruff/versioning/
-    "ruff < 0.15",  # keep in rough sync with .pre-commit-config.yaml
+    "ruff < 0.16",  # keep in rough sync with .pre-commit-config.yaml
+]
+
+[project.urls]
+"Homepage" = "https://github.com/smart-on-fhir/cumulus-fhir-support"
+
+[build-system]
+requires = ["flit_core >=3.4,<4"]
+build-backend = "flit_core.buildapi"
+
+[tool.flit.sdist]
+include = [
+    "tests/",
+    "LICENSE",
+    "*.md",
 ]
 
 [tool.ruff]

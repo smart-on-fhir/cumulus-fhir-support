@@ -98,7 +98,16 @@ class JwtAuth(Auth):
 
         try:
             response = await http.http_request(
-                session, "POST", self._config["token_endpoint"], data=auth_params
+                session,
+                "POST",
+                self._config["token_endpoint"],
+                data=auth_params,
+                # Retry fatal errors on reauthorization, because we've done this once before
+                # successfully, so we don't have reason to believe we'd really hit an error.
+                # We've seen Epic servers return bare 400 errors (the same error it gives for
+                # the wrong client credentials) in a flaky way when getting an access token.
+                # So on reauthorize, just retry any error the server gives us, it's likely flaky.
+                retry_fatals=reauthorize,
             )
             self._access_token = response.json().get("access_token")
         except http.NetworkError as exc:
