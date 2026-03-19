@@ -65,6 +65,7 @@ async def http_request(
     *,
     headers: dict | None = None,
     stream: bool = False,
+    retry_fatals: bool = False,
     retry_delays: Iterable[int] | None = None,
     request_callback: Callable[[], None] | None = None,
     error_callback: Callable[[NetworkError], None] | None = None,
@@ -82,6 +83,7 @@ async def http_request(
     :param url: URL to hit
     :param headers: optional header dictionary
     :param stream: whether to stream content in or load it all into memory at once
+    :param retry_fatals: whether to retry even fatal error codes like 404
     :param retry_delays: how many minutes to wait between retries, and how many retries to do,
                          defaults to [1, 1] which is three total tries across two minutes.
     :param request_callback: called right before each request
@@ -130,7 +132,8 @@ async def http_request(
         if error_callback:
             error_callback(error)
 
-        if delay is None or isinstance(error, FatalNetworkError):
+        is_fatal = not retry_fatals and isinstance(error, FatalNetworkError)
+        if delay is None or is_fatal:
             raise error
 
         response = error.response  # Note: may be None in case of DNS issues or the like

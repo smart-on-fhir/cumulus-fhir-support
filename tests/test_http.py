@@ -2,6 +2,7 @@
 
 import datetime
 import unittest
+from functools import partial
 from unittest import mock
 
 import ddt
@@ -130,6 +131,24 @@ class HttpTests(unittest.IsolatedAsyncioTestCase):
             cm.exception,
             cfs.TemporaryNetworkError if expect_retry else cfs.FatalNetworkError,
         )
+
+    @mock.patch("asyncio.sleep")
+    async def test_retry_fatals(self, sleep_mock):
+        self.respx_mock.get("http://example.com/").respond(status_code=400)
+
+        call = partial(
+            cfs.http_request, httpx.AsyncClient(), "GET", "http://example.com/", retry_delays=[1]
+        )
+
+        # Sanity check that without the flag, we don't retry the fatal
+        with self.assertRaises(cfs.FatalNetworkError):
+            await call()
+        self.assertEqual(sleep_mock.call_count, 0)
+
+        # Now with the flag, we do retry
+        with self.assertRaises(cfs.FatalNetworkError):
+            await call(retry_fatals=True)
+        self.assertEqual(sleep_mock.call_count, 1)
 
     @mock.patch("httpx.AsyncClient.send")
     @mock.patch("asyncio.sleep")
