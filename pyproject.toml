@@ -4,6 +4,7 @@ requires-python = ">= 3.10"
 dependencies = [
     "fhirclient >= 4.1",
     "httpx",
+    "inscriptis",
     "jwcrypto",
     "pyarrow >= 12",
 ]
