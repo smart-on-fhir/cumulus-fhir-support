@@ -18,4 +18,17 @@ from .ml_json import (
     read_multiline_json_from_dir,
     read_multiline_json_with_details,
 )
+from .notes import (
+    NoteFilter,
+    RefScanner,
+    RefSet,
+    RefsNotFound,
+    RemoteAttachment,
+    anon_id,
+    anon_ref,
+    get_text_from_note_res,
+    make_note_filter,
+    make_note_ref_scanner,
+    note_res_has_text,
+)
 from .schemas import pyarrow_schema_from_rows
