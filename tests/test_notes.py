@@ -165,6 +165,8 @@ class NoteTests(unittest.TestCase):
         assert not refs.has_type("Condition")
         assert refs.has_ref("Device/d")
         assert not refs.has_ref("Condition/c")
+        assert not refs.has_ref(None)
+        assert not refs.has_ref("other text")
         assert "Patient/p" in refs
         assert "Patient/x" not in refs
         assert refs.has_id("Device", "d")

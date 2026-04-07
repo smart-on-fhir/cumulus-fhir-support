@@ -219,7 +219,9 @@ class RefSet:  # noqa: PLW1641
     def has_id(self, res_type: str, id_val: str) -> bool:
         return id_val in self._ids.get(res_type, {})
 
-    def has_ref(self, ref: str) -> bool:
+    def has_ref(self, ref: str | None) -> bool:
+        if not ref or "/" not in ref:
+            return False
         res_type, id_val = ref.split("/", 1)
         return self.has_id(res_type, id_val)
 
@@ -229,7 +231,7 @@ class RefSet:  # noqa: PLW1641
     def __bool__(self) -> bool:
         return bool(self._ids)
 
-    def __contains__(self, ref: str) -> bool:
+    def __contains__(self, ref: str | None) -> bool:
         return self.has_ref(ref)
 
     def __eq__(self, other: "RefSet") -> bool:
