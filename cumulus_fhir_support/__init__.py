@@ -12,6 +12,7 @@ from .http import (
     http_request,
     parse_retry_after,
 )
+from .io import FsPath
 from .ml_json import (
     list_multiline_json_in_dir,
     read_multiline_json,

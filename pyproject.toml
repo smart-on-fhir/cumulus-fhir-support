@@ -2,7 +2,13 @@
 name = "cumulus-fhir-support"
 requires-python = ">= 3.10"
 dependencies = [
+    # Manually specify aiobotocore with a minimum version, to avoid some dependency hell.
+    # (fsspec -> s3fs -> aiobotocore -> botocore are all tightly pinned - adding the version here
+    # avoids a lot of backtracking on pip's part to old versions for some reason).
+    # Search "fsspec aiobotocore boto3" for more details and other frustrated people.
+    "aiobotocore >= 3",
     "fhirclient >= 4.1",
+    "fsspec[s3]",
     "httpx",
     "inscriptis",
     "jwcrypto",

@@ -14,8 +14,7 @@ where aborting on a single error you may not have control over rarely makes sens
 
 ** fsspec
 
-This module has optional support for file access via fsspec.
-It is not a required dependency, but will be used if provided.
+This module supports file access via fsspec (either directly or via FsPath).
 
 ** File format
 
@@ -37,21 +36,18 @@ including referencing it by name in the spec and some mimetypes
 (see https://www.hl7.org/fhir/nd-json.html).
 """
 
-import gzip
 import json
 import logging
-import os
 import pathlib
 import re
 from collections.abc import Generator, Iterable
-from typing import TYPE_CHECKING, Any, BinaryIO, Optional
+from typing import Any
 
-from . import resource_info
+import fsspec
 
-if TYPE_CHECKING:
-    import fsspec  # pragma: no cover
+from . import io, resource_info
 
-PathType = str | pathlib.Path
+PathType = str | pathlib.Path | io.FsPath
 ResourceType = str | Iterable[str] | None
 
 logger = logging.getLogger(__name__)
@@ -63,7 +59,7 @@ def list_multiline_json_in_dir(
     path: PathType,
     resource: ResourceType = None,
     *,
-    fsspec_fs: Optional["fsspec.AbstractFileSystem"] = None,
+    fsspec_fs: fsspec.AbstractFileSystem | None = None,
     recursive: bool = False,
 ) -> dict[str, str | None]:
     """
@@ -96,10 +92,10 @@ def list_multiline_json_in_dir(
     :param recursive: whether to recursively search subfolders
     :return: a dict of {path: resourceType} for all child files of the appropriate type(s)
     """
-    if fsspec_fs:
-        children = _list_fsspec_files(fsspec_fs, str(path), recursive=recursive)
-    else:
-        children = _list_local_files(pathlib.Path(path), recursive=recursive)
+    if not isinstance(path, io.FsPath):
+        path = io.FsPath(path, fs=fsspec_fs)
+
+    children = path.ls(include_dirs=False, recursive=recursive)
 
     # Coalesce resource to None or a set of strings
     if isinstance(resource, str):
@@ -110,82 +106,13 @@ def list_multiline_json_in_dir(
     # Now grab filenames for all target resource types
     results = {}
     for child in sorted(children):  # sorted as an API promise
-        results.update(_get_resource_type(child, resource, fsspec_fs=fsspec_fs))
+        results.update(_get_resource_type(child, resource))
     return results
-
-
-def _list_fsspec_files(
-    fsspec_fs: "fsspec.AbstractFileSystem",
-    path: str,
-    *,
-    recursive: bool = False,
-    visited: set[str] | None = None,
-) -> set[str]:
-    if not fsspec_fs.exists(path):
-        return set()
-    visited = visited or set()
-    results = set()
-
-    if recursive:
-        items = fsspec_fs.find(path, detail=True).values()
-    elif visited:
-        items = [fsspec_fs.info(path)]  # no iteration as we follow links
-    else:
-        items = fsspec_fs.ls(path, detail=True)
-
-    for details in items:
-        full = details["name"]
-        if details.get("islink") and details.get("destination"):
-            resolved = os.path.join(os.path.dirname(full), details.get("destination"))
-            resolved = os.path.normpath(resolved)
-            was_visited = resolved in visited
-            visited.add(resolved)
-            if not was_visited:
-                results |= _list_fsspec_files(
-                    fsspec_fs, resolved, recursive=recursive, visited=visited
-                )
-        elif details.get("type") == "file":
-            results.add(full)
-    return results
-
-
-def _list_local_files(path: pathlib.Path, recursive: bool = False) -> set[str]:
-    if not path.exists():
-        return set()
-    results = set()
-    for dirpath, _dirnames, filenames in os.walk(path, followlinks=True):
-        if dirpath != str(path) and not recursive:
-            continue
-        for filename in filenames:
-            full = pathlib.Path(dirpath) / filename
-            resolved = full.resolve()
-            if resolved.is_file():
-                results.add(str(resolved))
-    return results
-
-
-def _open(
-    path: PathType,
-    *,
-    fsspec_fs: Optional["fsspec.AbstractFileSystem"] = None,
-    fsspec_kwargs: dict | None = None,
-) -> BinaryIO:
-    """Opens a file with optional compression and fsspec"""
-    if fsspec_fs:
-        fsspec_kwargs = fsspec_kwargs or {}
-        return fsspec_fs.open(str(path), compression="infer", **fsspec_kwargs)
-
-    suffix = pathlib.Path(path).suffix.casefold()
-    if suffix == ".gz":
-        return gzip.open(path)
-    else:
-        return open(path, "rb")
 
 
 def _get_resource_type(
-    path: str,
+    path: io.FsPath,
     target_resources: set[str] | None,
-    fsspec_fs: Optional["fsspec.AbstractFileSystem"] = None,
 ) -> dict[str, str | None]:
     """
     Returns path & resource type if the file appears to be for the given resources.
@@ -216,13 +143,12 @@ def _get_resource_type(
 
     :param path: the file to examine
     :param target_resources: the type of FHIR resource(s) to accept for this file
-    :param fsspec_fs: optional fsspec FileSystem to use for I/O
     :return: a tiny dict of {path: resourceType} if the file is valid else {}
     """
     # Must look like a multi-line JSON file
     good_endings = {".jsonl", ".ndjson"}
     good_compressions = {".gz"}
-    suffixes = [x.casefold() for x in pathlib.Path(path).suffixes]
+    suffixes = [x.casefold() for x in path.suffixes]
     valid_filename = (len(suffixes) > 0 and suffixes[-1] in good_endings) or (
         len(suffixes) > 1 and suffixes[-2] in good_endings and suffixes[-1] in good_compressions
     )
@@ -234,7 +160,7 @@ def _get_resource_type(
     # - If a single resource type appears directly in a filename fragment, assume it applies.
     # We avoid counting a PractitionerRole.ndjson file as a Practitioner file by only looking for
     # complete words.
-    pieces = set(NONLETTER.split(pathlib.Path(path).name))
+    pieces = set(NONLETTER.split(path.name))
     found_types = pieces & resource_info.ALL_RESOURCES
     if len(found_types) == 1:
         resource_type = found_types.pop()
@@ -247,39 +173,35 @@ def _get_resource_type(
             # And since we cannot assume that "resourceType" is the first field,
             # we must parse the whole first line.
             # See https://www.hl7.org/fhir/R4/json.html#resources
-            if not (line := _read_first_line(path, fsspec_fs=fsspec_fs)):
+            if not (line := _read_first_line(path)):
                 return {}
             parsed = json.loads(line)
         except Exception as exc:
-            logger.warning("Could not read from '%s': %s", path, str(exc))
+            logger.warning("Could not read from '%s': %s", str(path), str(exc))
             return {}
 
         resource_type = parsed.get("resourceType") if isinstance(parsed, dict) else None
 
     if target_resources is None or resource_type in target_resources:
-        return {path: resource_type}
+        return {str(path): resource_type}
 
     # Didn't match our target resource types, just pretend it doesn't exist
     return {}
 
 
-def _read_first_line(
-    path: PathType,
-    *,
-    fsspec_fs: Optional["fsspec.AbstractFileSystem"] = None,
-) -> bytes:
+def _read_first_line(path: io.FsPath) -> bytes:
     # We just want the first line, and nothing else. The fsspec s3 block size default is 50M,
     # larger than we usually need for FHIR files. So we try to speed things up by just sipping
     # what we need. 9k is usually enough to only need one read call for gzipped files, at least
     # for all but the beefier inlined DocRefs.
-    with _open(path, fsspec_fs=fsspec_fs, fsspec_kwargs={"block_size": 9000}) as f:
+    with path.open("rb", block_size=9000) as f:
         return f.readline().rstrip(b"\r\n")
 
 
 def read_multiline_json_with_details(
     path: PathType,
     *,
-    fsspec_fs: Optional["fsspec.AbstractFileSystem"] = None,
+    fsspec_fs: fsspec.AbstractFileSystem | None = None,
     offset: int = 0,
 ) -> Generator[dict[str, Any]]:
     """
@@ -301,8 +223,11 @@ def read_multiline_json_with_details(
     :param offset: optionally, how far to seek into the file before returning results
     :return: a generator of dictionaries, with per-line info
     """
+    if not isinstance(path, io.FsPath):
+        path = io.FsPath(path, fs=fsspec_fs)
+
     try:
-        with _open(path, fsspec_fs=fsspec_fs) as f:
+        with path.open("rb") as f:
             if offset:
                 f.seek(offset)
             byte_total = 0
@@ -317,15 +242,17 @@ def read_multiline_json_with_details(
                 try:
                     yield {"json": json.loads(line), "line_num": line_num, "byte_offset": byte_num}
                 except json.JSONDecodeError as exc:
-                    logger.warning("Could not decode '%s:%d': %s", path, line_num + 1, str(exc))
+                    logger.warning(
+                        "Could not decode '%s:%d': %s", str(path), line_num + 1, str(exc)
+                    )
     except Exception as exc:
-        logger.error("Could not read from '%s': %s", path, str(exc))
+        logger.error("Could not read from '%s': %s", str(path), str(exc))
 
 
 def read_multiline_json(
     path: PathType,
     *,
-    fsspec_fs: Optional["fsspec.AbstractFileSystem"] = None,
+    fsspec_fs: fsspec.AbstractFileSystem | None = None,
 ) -> Generator[Any]:
     """
     Generator that yields lines of JSON from the target file.
@@ -347,7 +274,7 @@ def read_multiline_json_from_dir(
     path: PathType,
     resource: ResourceType = None,
     *,
-    fsspec_fs: Optional["fsspec.AbstractFileSystem"] = None,
+    fsspec_fs: fsspec.AbstractFileSystem | None = None,
     recursive: bool = False,
 ) -> Generator[Any]:
     """
