@@ -50,7 +50,6 @@ class FsPath:
         s3 = {}
 
         # We want to enforce server side encryption, because FHIR data is sensitive.
-        # Assume KMS encryption for now - we can make this tunable to AES256 if folks have a need.
         s3["s3_additional_kwargs"] = {"ServerSideEncryption": "aws:kms"}
 
         if endpoint_url:
@@ -71,7 +70,8 @@ class FsPath:
         *pathsegments: "str | pathlib.Path | FsPath",
         fs: fsspec.AbstractFileSystem | None = None,
     ):
-        """Creates an FsPath from path segments.
+        """
+        Creates an FsPath from path segments.
 
         Pass in one or more path segments, optionally starting with a URL.
 
@@ -81,31 +81,42 @@ class FsPath:
         # Clean up the path
         self._path = os.path.join(*map(str, pathsegments))
 
+        # It's possible to use a custom fsspec instance (mostly for backwards compabitility
+        # in some APIs that take an fsspec object)
+        self._custom_fs = fs
+        if self._custom_fs:
+            self._path = self._custom_fs.unstrip_protocol(self._path)
+
         # Remember the protocol - we'll want to reference it later to make the FS object
         parsed = urllib.parse.urlparse(self._path)
         self._protocol = parsed.scheme or "file"
 
-        # It's possible to use a custom fsspec instance (mostly for backwards compabitility
-        # in some APIs that take an fsspec object)
-        self._custom_fs = fs
-
     def copy(self, target: "FsPath") -> None:
-        """Copies this FsPath source onto the target path."""
-        if self.is_dir():
-            raise NotImplementedError("Cannot copy a source directory.")
-        if target.is_dir():
-            raise NotImplementedError("Cannot copy onto a target directory.")
+        """
+        Copies this FsPath source (file or dir tree) onto the target path.
 
-        with target.open("wb", compression=None) as out_file:
-            with self.open("rb", compression=None) as in_file:
-                while block := in_file.read(self.fs.blocksize):
-                    out_file.write(block)
+        Will make parent directories as needed.
+        """
 
-    def copy_into(self, target: "FsPath") -> None:
-        """Copies this FsPath source into the target folder."""
-        if not target.is_dir():
-            raise NotImplementedError("Cannot copy into a file.")
-        self.copy(target.joinpath(self.name))
+        if self == target:
+            return  # done
+        elif self.is_dir():
+            target.makedirs()
+            for path in self.ls():
+                path.copy_into(target)
+        else:
+            target.parent.makedirs()
+            self._copy_file(self, target)
+
+    def copy_into(self, target: "FsPath") -> "FsPath":
+        """
+        Copies this FsPath source into the target folder. Returns destination.
+
+        Will make parent directories as needed.
+        """
+        target = target.joinpath(self.name)
+        self.copy(target)
+        return target
 
     def exists(self) -> bool:
         return self.fs.exists(self._path)
@@ -147,7 +158,7 @@ class FsPath:
         """Returns True if this is a local file path."""
         return self._protocol == "file"
 
-    def joinpath(self, *pathsegments: str | pathlib.Path) -> "FsPath":
+    def joinpath(self, *pathsegments: "str | pathlib.Path | FsPath") -> "FsPath":
         return FsPath(self._path, *pathsegments)
 
     def ls(self, *, include_dirs: bool = True, recursive: bool = False) -> set["FsPath"]:
@@ -206,14 +217,31 @@ class FsPath:
 
     @property
     def parent(self) -> "FsPath":
-        return FsPath(self._full(os.path.dirname(self._path)))
+        path = self._path.removeprefix("file://")
+        parent = os.path.dirname(path) or "."
+
+        if parent == f"{self._protocol}:":
+            # We went too far - stay at the host/bucket level as the "root"
+            parent = self._path
+
+        return FsPath(self._full(parent))
 
     def relative_to(self, other: "FsPath") -> str:
         """If not relative to each other, returns the full path for self"""
-        return str(self).removeprefix(str(other)).lstrip("/")
+        str_self = str(self)
+        str_other = str(other)
+        if str_self.startswith(str_other):
+            return str_self.removeprefix(str_other).lstrip("/") or "."
+        else:
+            return str_self
 
     def rm(self) -> None:
         self.fs.rm(self._path, recursive=True)
+
+    @property
+    def stem(self) -> str:
+        """Returns the basename without the last suffix"""
+        return pathlib.Path(self._path).stem
 
     @property
     def suffix(self) -> str:
@@ -235,14 +263,12 @@ class FsPath:
         """Lets this be rendered directly by rich"""
         return str(self)
 
-    def __eq__(self, other: "FsPath | None") -> bool:
+    def __eq__(self, other: "str | pathlib.Path | FsPath | None") -> bool:
         if other is None:
             return False
         return str(self) == str(other)
 
-    def __lt__(self, other: "FsPath") -> bool:
-        if not isinstance(other, FsPath):
-            return NotImplemented
+    def __lt__(self, other: "str | pathlib.Path | FsPath") -> bool:
         return str(self) < str(other)
 
     def __hash__(self) -> int:
@@ -293,6 +319,13 @@ class FsPath:
     ###############################################
     # Private helpers
     ###############################################
+
+    @staticmethod
+    def _copy_file(src: "FsPath", dst: "FsPath") -> None:
+        with dst.open("wb", compression=None) as out_file:
+            with src.open("rb", compression=None) as in_file:
+                while block := in_file.read(src.fs.blocksize):
+                    out_file.write(block)
 
     def _full(self, path: str) -> str:
         if self.is_local:
