@@ -25,8 +25,8 @@ class NdjsonTests(unittest.TestCase):
         # Can drop this once we depend on 3.10+
         with mock.patch("cumulus_fhir_support.ml_json.logger") as mock_logger:
             yield
-        self.assertEqual(0, mock_logger.error.call_count)
-        self.assertEqual(0, mock_logger.warning.call_count)
+        self.assertEqual(0, mock_logger.error.call_count, mock_logger.error.call_args_list)
+        self.assertEqual(0, mock_logger.warning.call_count, mock_logger.warning.call_args_list)
 
     # ***************************
     # ** read_multiline_json() **
