@@ -12,7 +12,7 @@ dependencies = [
     "httpx",
     "inscriptis",
     "jwcrypto",
-    "pyarrow >= 12",
+    "pyarrow >= 23.0.1",
 ]
 authors = [
   { name="Michael Terry", email="michael.terry@childrens.harvard.edu" },
