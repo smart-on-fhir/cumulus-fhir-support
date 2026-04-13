@@ -7,7 +7,7 @@ dependencies = [
     # avoids a lot of backtracking on pip's part to old versions for some reason).
     # Search "fsspec aiobotocore boto3" for more details and other frustrated people.
     "aiobotocore >= 3",
-    "fhirclient >= 4.1",
+    "fhirclient >= 4.4.0",
     "fsspec[s3]",
     "httpx",
     "inscriptis",
