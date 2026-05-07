@@ -49,13 +49,10 @@ class FsPath:
         ### S3 ###
         s3 = {}
 
-        # We want to enforce server side encryption, because FHIR data is sensitive.
-        s3["s3_additional_kwargs"] = {"ServerSideEncryption": "aws:kms"}
-
         if endpoint_url:
             s3["endpoint_url"] = endpoint_url
         if kms_key:
-            s3["s3_additional_kwargs"]["SSEKMSKeyId"] = kms_key
+            s3["s3_additional_kwargs"] = {"SSEKMSKeyId": kms_key}
         if region:
             s3["client_kwargs"] = {"region_name": region}
 

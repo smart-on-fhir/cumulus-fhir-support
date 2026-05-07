@@ -116,9 +116,7 @@ class IoTests(unittest.TestCase):
         # Confirm the filesystem used got the options
         self.assertEqual(s3.fs.endpoint_url, "yup")
         self.assertEqual(s3.fs.client_kwargs, {"region_name": "region"})
-        self.assertEqual(
-            s3.fs.s3_additional_kwargs, {"SSEKMSKeyId": "kms", "ServerSideEncryption": "aws:kms"}
-        )
+        self.assertEqual(s3.fs.s3_additional_kwargs, {"SSEKMSKeyId": "kms"})
 
     def test_custom_fs(self):
         fs = fsspec.filesystem("s3")
