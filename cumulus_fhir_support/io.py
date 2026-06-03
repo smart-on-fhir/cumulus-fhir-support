@@ -9,6 +9,7 @@ import typing
 import urllib.parse
 
 import fsspec
+import s3fs
 
 # Sentinel object to distinguish whether a default arg was provided.
 # Once we depend on Python 3.13, we can use typing.NoDefault.
@@ -56,7 +57,7 @@ class FsPath:
         if region:
             s3["client_kwargs"] = {"region_name": region}
 
-        cls._fsspecs["s3"] = fsspec.filesystem("s3", **s3)
+        cls._fsspecs["s3"] = s3fs.S3FileSystem(**s3)
 
     @classmethod
     def get_registered_options(cls) -> dict[str, str | None]:
