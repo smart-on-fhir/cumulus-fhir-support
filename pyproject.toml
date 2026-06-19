@@ -6,7 +6,7 @@ dependencies = [
     # (fsspec -> s3fs -> aiobotocore -> botocore are all tightly pinned - adding the version here
     # avoids a lot of backtracking on pip's part to old versions for some reason).
     # Search "fsspec aiobotocore boto3" for more details and other frustrated people.
-    "aiobotocore >= 3",
+    "aiobotocore >= 3.3.0",
     "fhirclient >= 4.1",
     "fsspec[s3]",
     "httpx",
