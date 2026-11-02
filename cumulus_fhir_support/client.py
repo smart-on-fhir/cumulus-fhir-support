@@ -109,6 +109,7 @@ class FhirClient:
         request_callback: Callable[[], None] | None = None,
         error_callback: Callable[[http.NetworkError], None] | None = None,
         retry_callback: Callable[[httpx.Response | None, int], None] | None = None,
+        **kwargs,
     ) -> httpx.Response:
         """
         Issues an HTTP request.
@@ -160,6 +161,7 @@ class FhirClient:
             error_callback=error_callback,
             retry_callback=retry_callback,
             auth_callback=self._reauthorize,
+            **kwargs,
         )
 
     @property
