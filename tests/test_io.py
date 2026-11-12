@@ -127,7 +127,7 @@ class IoTests(unittest.TestCase):
         self.assertIs(s3.fs, fs)
 
     def test_windows_fs(self):
-        fs = fsspec.filesystem("windows")
+        fs = fsspec.filesystem("file")
         windows = cfs.FsPath("C:\\Users\\me")
 
         self.assertEqual(windows._protocol, "file")
