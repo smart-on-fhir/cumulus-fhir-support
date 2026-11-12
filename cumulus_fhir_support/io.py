@@ -86,9 +86,9 @@ class FsPath:
             self._path = self._custom_fs.unstrip_protocol(self._path)
 
         # Remember the protocol - we'll want to reference it later to make the FS object
-        # but first we check if we are on windows because that breaks things
-        if isinstance(pathlib.Path(), pathlib.WindowsPath) or isinstance(
-            pathlib.Path(), pathlib.PureWindowsPath
+        # but first we check if we are on Windows because that breaks things
+        if isinstance(pathlib.Path(), (pathlib.WindowsPath, pathlib.PureWindowsPath)) or isinstance(
+            pathsegments, (pathlib.WindowsPath, pathlib.PureWindowsPath)
         ):
             self._protocol = "file"
 
