@@ -91,15 +91,19 @@ class FsPath:
         parsed = urllib.parse.urlparse(self._path)
         self._protocol = parsed.scheme or "file"
 
-        if self._protocol not in fsspec.available_protocols() or isinstance(
-            pathlib.Path(), (pathlib.WindowsPath, pathlib.PureWindowsPath)
-        ):
-            self._protocol = "file"
-        else:
-            raise Exception(
-                f"Invalid filesystem protocol, found: "
-                f"{self._protocol} expected {fsspec.available_protocols()}"
-            )
+        if self._protocol not in fsspec.available_protocols():
+            if isinstance(pathlib.Path(), (pathlib.WindowsPath, pathlib.PureWindowsPath)) or any(
+                map(
+                    lambda x: isinstance(x, (pathlib.WindowsPath, pathlib.PureWindowsPath)),
+                    pathsegments,
+                )
+            ):
+                self._protocol = "file"
+            else:
+                raise Exception(
+                    f"Invalid filesystem protocol, found: "
+                    f"{self._protocol} expected {fsspec.available_protocols()}"
+                )
 
     def copy(self, target: "FsPath") -> None:
         """
