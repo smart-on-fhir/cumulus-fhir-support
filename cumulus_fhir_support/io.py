@@ -87,8 +87,11 @@ class FsPath:
 
         # Remember the protocol - we'll want to reference it later to make the FS object
         # but first we check if we are on Windows because that breaks things
-        if isinstance(pathlib.Path(), (pathlib.WindowsPath, pathlib.PureWindowsPath)) or isinstance(
-            pathsegments, (pathlib.WindowsPath, pathlib.PureWindowsPath)
+        if isinstance(pathlib.Path(), (pathlib.WindowsPath, pathlib.PureWindowsPath)) or any(
+            map(
+                lambda x: isinstance(x, (pathlib.WindowsPath, pathlib.PureWindowsPath)),
+                pathsegments,
+            )
         ):
             self._protocol = "file"
 
