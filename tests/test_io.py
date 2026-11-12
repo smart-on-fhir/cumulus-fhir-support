@@ -128,7 +128,9 @@ class IoTests(unittest.TestCase):
 
     def test_windows_fs(self):
         fs = fsspec.filesystem("file")
-        windows = cfs.FsPath("C:\\Users\\me")
+        # we need to use a PureWindowsPath to force linux-like filesystem to flag this as a win path
+        # because if string it gets detected by os.sep which is host dependent
+        windows = cfs.FsPath(pathlib.PureWindowsPath("C:\\Users\\me"))
 
         self.assertEqual(windows._protocol, "file")
         self.assertIs(windows.fs, fs)
