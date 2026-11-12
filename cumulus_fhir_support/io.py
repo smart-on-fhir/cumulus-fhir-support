@@ -91,7 +91,7 @@ class FsPath:
         parsed = urllib.parse.urlparse(self._path)
         self._protocol = parsed.scheme or "file"
 
-        if self._protocol not in fsspec.available_protocols() and isinstance(
+        if self._protocol not in fsspec.available_protocols() or isinstance(
             pathlib.Path(), (pathlib.WindowsPath, pathlib.PureWindowsPath)
         ):
             self._protocol = "file"
