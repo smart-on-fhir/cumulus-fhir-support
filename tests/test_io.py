@@ -135,6 +135,20 @@ class IoTests(unittest.TestCase):
         self.assertEqual(windows._protocol, "file")
         self.assertIs(windows.fs, fs)
 
+    def test_posix_fs(self):
+        fs = fsspec.filesystem("file")
+        posix = cfs.FsPath(pathlib.PosixPath("C:\\Users\\me"))
+
+        self.assertEqual(posix._protocol, "file")
+        self.assertIs(posix.fs, fs)
+
+    def test_pure_posix_fs(self):
+        fs = fsspec.filesystem("file")
+        posix = cfs.FsPath(pathlib.PurePosixPath("C:\\Users\\me"))
+
+        self.assertEqual(posix._protocol, "file")
+        self.assertIs(posix.fs, fs)
+
     def test_invalid_fs(self):
         with self.assertRaises(Exception):
             cfs.FsPath("lol:/home/me")
