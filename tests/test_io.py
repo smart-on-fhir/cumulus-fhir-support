@@ -126,6 +126,13 @@ class IoTests(unittest.TestCase):
         self.assertEqual(str(s3), "s3://bucket/file.txt")
         self.assertIs(s3.fs, fs)
 
+    def test_windows_fs(self):
+        fs = fsspec.filesystem("windows")
+        windows = cfs.FsPath("C:\\Users\\me")
+
+        self.assertEqual(windows._protocol, "file")
+        self.assertIs(windows.fs, fs)
+
     def test_rm(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             path = cfs.FsPath(tmpdir, "1/2/3/4/5/file.txt")

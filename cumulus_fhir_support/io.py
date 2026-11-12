@@ -86,8 +86,15 @@ class FsPath:
             self._path = self._custom_fs.unstrip_protocol(self._path)
 
         # Remember the protocol - we'll want to reference it later to make the FS object
-        parsed = urllib.parse.urlparse(self._path)
-        self._protocol = parsed.scheme or "file"
+        # but first we check if we are on windows because that breaks things
+        if isinstance(pathlib.Path(), pathlib.WindowsPath) or isinstance(
+            pathlib.Path(), pathlib.PureWindowsPath
+        ):
+            self._protocol = "file"
+
+        else:
+            parsed = urllib.parse.urlparse(self._path)
+            self._protocol = parsed.scheme or "file"
 
     def copy(self, target: "FsPath") -> None:
         """
