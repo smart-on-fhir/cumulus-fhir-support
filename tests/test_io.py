@@ -126,6 +126,33 @@ class IoTests(unittest.TestCase):
         self.assertEqual(str(s3), "s3://bucket/file.txt")
         self.assertIs(s3.fs, fs)
 
+    def test_windows_fs(self):
+        fs = fsspec.filesystem("file")
+        # we need to use a PureWindowsPath to force linux-like filesystem to flag this as a win path
+        # because if string it gets detected by os.sep which is host dependent
+        windows = cfs.FsPath(pathlib.PureWindowsPath("C:\\Users\\me"))
+
+        self.assertEqual(windows._protocol, "file")
+        self.assertIs(windows.fs, fs)
+
+    def test_posix_fs(self):
+        fs = fsspec.filesystem("file")
+        posix = cfs.FsPath(pathlib.PosixPath("/home/me"))
+
+        self.assertEqual(posix._protocol, "file")
+        self.assertIs(posix.fs, fs)
+
+    def test_pure_posix_fs(self):
+        fs = fsspec.filesystem("file")
+        posix = cfs.FsPath(pathlib.PurePosixPath("/home/me"))
+
+        self.assertEqual(posix._protocol, "file")
+        self.assertIs(posix.fs, fs)
+
+    def test_invalid_fs(self):
+        with self.assertRaises(Exception):
+            cfs.FsPath("lol:/home/me")
+
     def test_rm(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             path = cfs.FsPath(tmpdir, "1/2/3/4/5/file.txt")
