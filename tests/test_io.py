@@ -135,6 +135,10 @@ class IoTests(unittest.TestCase):
         self.assertEqual(windows._protocol, "file")
         self.assertIs(windows.fs, fs)
 
+    def test_invalid_fs(self):
+        with self.assertRaises(Exception):
+            cfs.FsPath("lol:/home/me")
+
     def test_rm(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             path = cfs.FsPath(tmpdir, "1/2/3/4/5/file.txt")

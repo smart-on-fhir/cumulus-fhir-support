@@ -94,12 +94,11 @@ class FsPath:
         if self._protocol not in fsspec.available_protocols() and isinstance(
             pathlib.Path(), (pathlib.WindowsPath, pathlib.PureWindowsPath)
         ):
-            self.protocol = "file"
+            self._protocol = "file"
         else:
             raise Exception(
-                "Invalid filesystem protocol, found: {} expected {}".format(
-                    self.protocol, fsspec.available_protocols()
-                )
+                f"Invalid filesystem protocol, found: "
+                f"{self._protocol} expected {fsspec.available_protocols()}"
             )
 
     def copy(self, target: "FsPath") -> None:
